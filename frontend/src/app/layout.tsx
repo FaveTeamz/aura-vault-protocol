@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import WalletConnect from "@/components/WalletConnect";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,12 +42,30 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
         <ThemeProvider>
-          <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
-            <a href="/" className="text-sm font-semibold tracking-tight">Aura Vault</a>
-            <div className="flex items-center gap-4">
+          <header className="flex items-center justify-between gap-4 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
+            <a href="/" className="text-sm font-semibold tracking-tight shrink-0">
+              Aura Vault
+            </a>
+
+            {/* Wallet connection — occupies the center/right of the header */}
+            <div className="flex-1 max-w-sm">
+              <WalletConnect />
+            </div>
+
+            <div className="flex items-center gap-4 shrink-0">
               <nav className="flex gap-4 text-sm">
-                <a href="/faq" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">FAQ</a>
-                <a href="/settings" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Settings</a>
+                <a
+                  href="/faq"
+                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                >
+                  FAQ
+                </a>
+                <a
+                  href="/settings"
+                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                >
+                  Settings
+                </a>
               </nav>
               <LanguageSwitcher />
               <ThemeToggle />
