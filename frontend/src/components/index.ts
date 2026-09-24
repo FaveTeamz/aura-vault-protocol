@@ -8,6 +8,7 @@ export { default as FAQPage } from "./FAQPage";
 export { default as LazyImage } from "./LazyImage";
 export { default as PageTransition } from "./PageTransition";
 export { default as ProgressBar } from "./ProgressBar";
+export { default as ApyCalculator } from "./ApyCalculator";
 
 // Named exports
 export { ThemeToggle } from "./ThemeToggle";
