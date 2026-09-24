@@ -7,6 +7,7 @@ export { default as VaultActions } from "./VaultActions";
 export { default as FAQPage } from "./FAQPage";
 export { default as LazyImage } from "./LazyImage";
 export { default as PageTransition } from "./PageTransition";
+export { HarvestButton } from "./HarvestButton";
 
 // Named exports
 export { ThemeToggle } from "./ThemeToggle";
