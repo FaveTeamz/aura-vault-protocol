@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { HeaderWidgets } from "@/components/HeaderWidgets";
 
 import "./globals.css";
 
@@ -33,6 +34,9 @@ export default function RootLayout({
             <a href="/" className="text-sm font-semibold tracking-tight">
               Aura Vault
             </a>
+
+            {/* Live share price ticker + wallet balance */}
+            <HeaderWidgets />
 
             <div className="flex items-center gap-4">
               <nav className="flex gap-4 text-sm">
