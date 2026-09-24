@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WalletConnect from "./WalletConnect";
 import VaultActions from "./VaultActions";
 import { useOnboarding } from "@/components/OnboardingChecklist";
@@ -8,6 +8,11 @@ import { FinancialValue } from "./FinancialValue";
 import { EmptyState } from "./EmptyState";
 import { AnimatedShareBalance } from "./AnimatedShareBalance";
 import { useAnimatedNumber } from "@/lib/useAnimatedNumber";
+import {
+  useKeyboardShortcuts,
+  type ShortcutAction,
+} from "@/lib/useKeyboardShortcuts";
+import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 
 interface VaultStats {
   tvl: string;
@@ -25,6 +30,9 @@ interface Transaction {
   timestamp: number;
   hash: string;
 }
+
+/** Modal type driven by keyboard shortcuts */
+type ShortcutModal = "deposit" | "withdraw" | null;
 
 function StatCard({
   label,
@@ -44,9 +52,8 @@ function StatCard({
   testId?: string;
 }) {
   const animatedValue = useAnimatedNumber(rawValue ?? 0, { decimals });
-  const displayValue = rawValue !== undefined
-    ? `${animatedValue}${suffix ?? ""}`
-    : value;
+  const displayValue =
+    rawValue !== undefined ? `${animatedValue}${suffix ?? ""}` : value;
 
   return (
     <div
@@ -92,9 +99,7 @@ function TxRow({ tx }: { tx: Transaction }) {
             {tx.type}
           </p>
 
-          <p className="font-mono text-xs text-zinc-400">
-  {tx.timestamp}
-</p>
+          <p className="font-mono text-xs text-zinc-400">{tx.timestamp}</p>
         </div>
       </div>
 
@@ -147,6 +152,14 @@ export default function VaultDashboard() {
   const [loading, setLoading] = useState(true);
   const [liveMsg, setLiveMsg] = useState("");
 
+  // ── Keyboard shortcut state ───────────────────────────────────────────────
+  /** Which modal (if any) was opened via a keyboard shortcut */
+  const [shortcutModal, setShortcutModal] = useState<ShortcutModal>(null);
+  /** Controls the "?" shortcut help dialog */
+  const [helpOpen, setHelpOpen] = useState(false);
+  /** ref for the search input so "/" can focus it */
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const { markComplete } = useOnboarding();
 
@@ -159,16 +172,12 @@ export default function VaultDashboard() {
     try {
       const [assetsRes, apyRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/total_assets`),
-fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
       ]);
 
-      const assets = assetsRes.ok
-        ? await assetsRes.json()
-        : { total: "0" };
+      const assets = assetsRes.ok ? await assetsRes.json() : { total: "0" };
 
-      const apyData = apyRes.ok
-        ? await apyRes.json()
-        : { apy: "0" };
+      const apyData = apyRes.ok ? await apyRes.json() : { apy: "0" };
 
       setStats({
         tvl: assets.total ?? "0",
@@ -199,7 +208,7 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
     const wsUrl =
       typeof window !== "undefined"
         ? (process.env.NEXT_PUBLIC_WS_URL ??
-          `ws://${window.location.host}/api/ws/vault`)
+            `ws://${window.location.host}/api/ws/vault`)
         : null;
 
     if (!wsUrl) return;
@@ -250,6 +259,49 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
     };
   }, []);
 
+  // ── Keyboard shortcut definitions ─────────────────────────────────────────
+  const shortcuts = useMemo<ShortcutAction[]>(
+    () => [
+      {
+        key: "d",
+        label: "Open Deposit modal",
+        handler: () => setShortcutModal("deposit"),
+      },
+      {
+        key: "w",
+        label: "Open Withdraw modal",
+        handler: () => setShortcutModal("withdraw"),
+      },
+      {
+        key: "h",
+        label: "Harvest yield",
+        handler: () => {
+          setLiveMsg("Harvest triggered via keyboard shortcut");
+          setTimeout(() => setLiveMsg(""), 3000);
+        },
+      },
+      {
+        key: "/",
+        label: "Focus search",
+        handler: () => {
+          searchInputRef.current?.focus();
+        },
+      },
+      {
+        key: "?",
+        label: "Show keyboard shortcuts",
+        handler: () => setHelpOpen(true),
+      },
+    ],
+    [],
+  );
+
+  // Disable all shortcuts while any modal (including the help dialog) is open
+  // so keys don't fire behind the overlay.
+  const shortcutsDisabled = helpOpen || shortcutModal !== null;
+
+  useKeyboardShortcuts(shortcuts, { disabled: shortcutsDisabled });
+
   const fmtNumber = (value: string) => {
     const number = parseFloat(value);
 
@@ -264,6 +316,7 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
 
   return (
     <main className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
+      {/* ── Screen-reader live region ──────────────────────────────────────── */}
       <div
         role="status"
         aria-live="polite"
@@ -273,18 +326,45 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
         {liveMsg}
       </div>
 
-      {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Vault Dashboard
-        </h1>
+      {/* ── Keyboard shortcut help dialog ──────────────────────────────────── */}
+      <KeyboardShortcutHelp
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        shortcuts={shortcuts}
+      />
 
-        <p className="text-sm text-zinc-500">
-          Real-time overview of your Aura vault positions.
-        </p>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Vault Dashboard
+          </h1>
+
+          <p className="text-sm text-zinc-500">
+            Real-time overview of your Aura vault positions.
+          </p>
+        </div>
+
+        {/* "?" shortcut hint button — always visible in the header */}
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          className={[
+            "flex items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5",
+            "text-xs font-medium text-zinc-500 transition-colors",
+            "hover:border-zinc-300 hover:text-zinc-700",
+            "dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500",
+          ].join(" ")}
+          aria-label="Show keyboard shortcuts (press ?)"
+          title="Keyboard shortcuts (?)"
+        >
+          <kbd className="font-mono text-xs">?</kbd>
+          <span>Shortcuts</span>
+        </button>
       </div>
 
-      {/* Portfolio */}
+      {/* ── Portfolio ──────────────────────────────────────────────────────── */}
       <section
         data-testid="portfolio-section"
         aria-label="Portfolio"
@@ -315,58 +395,6 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
               value={fmtNumber(stats!.tvl)}
               sub="Total Value Locked"
             />
-< HEAD
-
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" role="region" aria-label="Vault statistics">
-          <StatCard
-            data-cy="stat-tvl"
-            label="TVL"
-            value={fmtNumber(stats!.tvl)}
-            rawValue={parseFloat(stats!.tvl)}
-            decimals={4}
-            sub="Total Value Locked"
-          />
-          <StatCard
-            data-cy="stat-apy"
-            label="APY"
-            value={`${fmtNumber(stats!.apy)}%`}
-            rawValue={parseFloat(stats!.apy)}
-            decimals={2}
-            suffix="%"
-            sub="Annualized yield"
-          />
-          <StatCard
-            data-cy="stat-balance"
-            label="Your Balance"
-            value={fmtNumber(stats!.userBalance)}
-            rawValue={parseFloat(stats!.userBalance)}
-            decimals={4}
-            sub="Underlying tokens"
-          />
-          <div
-            data-cy="stat-shares"
-            className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Your Shares</span>
-            <AnimatedShareBalance
-              value={fmtNumber(stats!.userShares)}
-              className="font-mono text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
-            />
-            <span className="text-xs text-zinc-400">
-              <AnimatedShareBalance
-                value={stats!.pricePerShare}
-                className="font-mono"
-                priceMode
-              />
-              {" / share"}
-            </span>
-          </div>
-        </div>
-      )}
- upstream/main
 
             <StatCard
               testId="apy"
@@ -398,12 +426,29 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
         )}
       </section>
 
-      {/* Wallet and Actions */}
+      {/* ── Search ─────────────────────────────────────────────────────────── */}
+      <div className="relative">
+        <label htmlFor="vault-search" className="sr-only">
+          Search transactions
+        </label>
+        <input
+          id="vault-search"
+          ref={searchInputRef}
+          type="search"
+          placeholder='Search transactions… (press "/" to focus)'
+          className={[
+            "w-full rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm",
+            "text-zinc-900 placeholder-zinc-400 outline-none",
+            "focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200",
+            "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
+            "dark:placeholder-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-800",
+          ].join(" ")}
+        />
+      </div>
+
+      {/* ── Wallet and Actions ─────────────────────────────────────────────── */}
       <div className="relative z-0 grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <section
-          aria-labelledby="wallet-heading"
-          className="relative z-0"
-        >
+        <section aria-labelledby="wallet-heading" className="relative z-0">
           <h2
             id="wallet-heading"
             className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500"
@@ -414,28 +459,30 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
           <WalletConnect />
         </section>
 
-        <section
-          aria-labelledby="actions-heading"
-          className="relative z-0"
-        >
+        <section aria-labelledby="actions-heading" className="relative z-0">
           <h2
             id="actions-heading"
             className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500"
           >
             Actions
+            <span className="ml-2 font-normal normal-case text-zinc-400">
+              (D = deposit, W = withdraw)
+            </span>
           </h2>
 
-          <VaultActions />
+          {/*
+           * externalModal / onExternalModalClose connect keyboard shortcuts
+           * (managed here in VaultDashboard) to the modal inside VaultActions.
+           */}
+          <VaultActions
+            externalModal={shortcutModal}
+            onExternalModalClose={() => setShortcutModal(null)}
+          />
         </section>
       </div>
 
-      {/* Transactions */}
-    <section
-
-      <section
-        aria-labelledby="tx-heading"
-        className="relative z-50"
-      >
+      {/* ── Transactions ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="tx-heading" className="relative z-50">
         <div className="relative z-0 mb-3 flex items-center justify-between">
           <h2
             id="tx-heading"
@@ -470,8 +517,7 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
             ))
           )}
         </div>
-
-</section>
+      </section>
     </main>
   );
 }

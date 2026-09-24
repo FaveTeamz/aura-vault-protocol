@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * VaultActions (#478 update)
+ * VaultActions (#478 update, #269 keyboard shortcuts update)
  *
  * Deposit / Withdraw action panel.
  * The Deposit button now uses <DepositButton> which shows:
  *   - Spinner while a deposit is pending
  *   - Checkmark on success (auto-resets after 2 s)
  *   - × on failure (auto-resets after 2 s)
+ *
+ * #269: accepts an optional `externalModal` prop so that keyboard
+ * shortcuts registered in a parent component can open a modal
+ * without pointer interaction.
  */
 
 import { useState, useEffect } from "react";
@@ -17,30 +21,62 @@ import { useOnboarding } from "@/components/OnboardingChecklist";
 
 type Tab = "deposit" | "withdraw";
 
-export default function VaultActions() {
+interface VaultActionsProps {
+  /**
+   * When set by a parent (e.g. via keyboard shortcut), immediately opens
+   * the specified modal.  The parent is responsible for resetting this to
+   * `null` after the modal closes (via `onExternalModalClose`).
+   */
+  externalModal?: Tab | null;
+  /** Called after an externally-triggered modal has been closed. */
+  onExternalModalClose?: () => void;
+}
+
+export default function VaultActions({
+  externalModal,
+  onExternalModalClose,
+}: VaultActionsProps = {}) {
   const [tab, setTab] = useState<Tab>("deposit");
   const [modal, setModal] = useState<Tab | null>(null);
   const [balance, setBalance] = useState("1000");
   const [depositState, setDepositState] = useState<ButtonTxState>("idle");
   const [sharePrice, setSharePrice] = useState("1.0");
-  const [sharePriceUpdatedAt, setSharePriceUpdatedAt] = useState<number | undefined>(undefined);
+  const [sharePriceUpdatedAt, setSharePriceUpdatedAt] = useState<
+    number | undefined
+  >(undefined);
   const { markComplete } = useOnboarding();
 
   useEffect(() => {
-   useEffect(() => {
-  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/balance_of?address=mock`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => {
-      if (d?.balance) setBalance(d.balance);
-    })
-    .catch(() => {});
-}, []);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/balance_of?address=mock`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.balance) setBalance(d.balance);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Sync the internal modal state when the parent requests an open.
+  useEffect(() => {
+    if (externalModal) {
+      if (externalModal === "deposit") {
+        setTab("deposit");
+        setDepositState("pending");
+      } else {
+        setTab("withdraw");
+      }
+      setModal(externalModal);
+    }
+  }, [externalModal]);
+
   /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
    */
   function handleModalClose(type: Tab, outcome?: "success" | "error") {
     setModal(null);
+    // Notify the parent that an externally-triggered modal has closed.
+    onExternalModalClose?.();
+
     if (type === "deposit") {
       markComplete("make_first_deposit");
       if (outcome === "success") {
@@ -49,6 +85,8 @@ export default function VaultActions() {
       } else if (outcome === "error") {
         setDepositState("error");
         setTimeout(() => setDepositState("idle"), 2000);
+      } else {
+        setDepositState("idle");
       }
     }
   }
