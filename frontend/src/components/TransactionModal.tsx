@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { getStoredReferralCode, clearReferralCode } from "@/lib/referral";
 
 type TxType = "deposit" | "withdraw";
 type Step = 1 | 2 | 3;
@@ -10,6 +11,10 @@ type TxStatus = "idle" | "pending" | "success" | "error";
 interface Props {
   type: TxType;
   balance: string;
+  /** Optional: current share price, used for display */
+  sharePrice?: string;
+  /** Optional: timestamp of last share price update */
+  sharePriceUpdatedAt?: number;
   onClose: () => void;
 }
 
@@ -117,10 +122,20 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
     }
 
     try {
+      // Attach the referral code (if any) as metadata on deposit transactions.
+      // The backend uses this to credit the referrer and register the referral.
+      const referralCode =
+        type === "deposit" ? getStoredReferralCode() : null;
+
+      const payload: Record<string, unknown> = { type, amount };
+      if (referralCode) {
+        payload.referralCode = referralCode;
+      }
+
       const res = await fetch("/api/vault/transactions/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, amount }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -132,6 +147,12 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
       setTxHash(data.hash || `tx-${Date.now()}`);
       setStatus("success");
       setRetryCount(0);
+
+      // Clear the stored referral code after a successful deposit so it is
+      // not re-used on subsequent transactions.
+      if (type === "deposit" && referralCode) {
+        clearReferralCode();
+      }
     } catch (err: unknown) {
       const errorMsg = (err instanceof Error ? err.message : "Transaction failed") ?? "Transaction failed";
       setTxError(errorMsg);

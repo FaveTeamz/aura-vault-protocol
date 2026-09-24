@@ -36,8 +36,10 @@ import { startEmailWorker, stopEmailWorker } from "./services/emailQueue.js";
 import { startYieldWorker, stopYieldWorker } from "./services/yieldWorker.js";
 import { vaultRouter } from "./routes/vaultRoutes.js";
 import { vaultTransactionRouter } from "./routes/vaultTransactionRoutes.js";
+import { vaultSubmitRouter } from "./routes/vaultSubmitRoutes.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
+import { referralRouter } from "./routes/referralRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
 import {
   applySecurityHeaders,
@@ -166,6 +168,12 @@ app.use("/api/analytics", analyticsRouter);
 
 // Issue #302: Vault transaction endpoints (deposit / withdraw / harvest)
 app.use("/api/v1/vault", vaultTransactionRouter);
+
+// Vault transaction submit — lightweight UI modal endpoint
+app.use("/api/vault/transactions", vaultSubmitRouter);
+
+// Referral tracking — public routes (register, stats, deposit webhook)
+app.use("/api/referrals", referralRouter);
 
 // Issue #868: OpenAPI 3.1 Spec and Swagger UI at /api/docs
 app.use("/api/docs", swaggerRouter);

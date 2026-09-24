@@ -38,6 +38,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { HeroCard } from "./HeroCard";
 import { ApyCard, DepositorCountCard, LastHarvestCard } from "./MetricCards";
 import { UserPositionCard, type UserPosition } from "./UserPositionCard";
+import { ReferralWidget } from "./ReferralWidget";
 import {
   useWidgetLayout,
   type WidgetId,
@@ -61,6 +62,8 @@ interface SortableWidgetProps {
   stats: VaultStats | null;
   position: UserPosition | null;
   loading: boolean;
+  /** Connected wallet address (may be undefined) */
+  walletAddress?: string;
   /** True while this specific item is being dragged */
   isDragging: boolean;
 }
@@ -91,11 +94,13 @@ function WidgetContent({
   stats,
   position,
   loading,
+  walletAddress,
 }: {
   id: WidgetId;
   stats: VaultStats | null;
   position: UserPosition | null;
   loading: boolean;
+  walletAddress?: string;
 }) {
   switch (id) {
     case "hero":
@@ -126,6 +131,8 @@ function WidgetContent({
       );
     case "user-position":
       return <UserPositionCard position={position} isLoading={loading} />;
+    case "referral":
+      return <ReferralWidget address={walletAddress} isLoading={loading} />;
     default:
       return null;
   }
@@ -139,6 +146,7 @@ function SortableWidget({
   position,
   loading,
   isDragging,
+  walletAddress,
 }: SortableWidgetProps) {
   const {
     attributes,
@@ -208,6 +216,7 @@ function SortableWidget({
         stats={stats}
         position={position}
         loading={loading}
+        walletAddress={walletAddress}
       />
     </div>
   );
@@ -223,6 +232,9 @@ export function SortableDashboardGrid() {
   const [liveMsg, setLiveMsg] = useState("");
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Derive wallet address from the user position (set when wallet is connected)
+  const walletAddress = position?.address || undefined;
 
   // Only render visible widgets
   const visibleWidgets = widgets.filter((w) => w.visible);
@@ -446,6 +458,7 @@ export function SortableDashboardGrid() {
                 position={position}
                 loading={loading}
                 isDragging={activeId !== null}
+                walletAddress={walletAddress}
               />
             ))}
           </div>
@@ -474,6 +487,7 @@ export function SortableDashboardGrid() {
                 stats={stats}
                 position={position}
                 loading={loading}
+                walletAddress={walletAddress}
               />
             </div>
           ) : null}
