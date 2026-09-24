@@ -18,6 +18,7 @@ import { queueRouter } from './queueRoutes.js';
 import { vaultRouter } from './vaultRoutes.js';
 import { userPreferencesRouter } from './userPreferencesRoutes.js';
 import { analyticsRouter } from './analyticsRoutes.js';
+import { stellarRouter } from './stellarRoutes.js';
 
 export const v1Router = Router();
 
@@ -32,3 +33,4 @@ v1Router.use('/queue', queueRouter);
 v1Router.use('/vault', vaultRouter);
 v1Router.use('/users/preferences', authenticate, userPreferencesRouter);
 v1Router.use('/analytics', analyticsRouter);
+v1Router.use('/stellar', stellarRouter);

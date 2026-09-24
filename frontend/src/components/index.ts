@@ -1,6 +1,7 @@
 // Default exports
 export { default as WalletConnect } from "./WalletConnect";
 export { default as TransactionModal } from "./TransactionModal";
+export { default as PreSignBreakdown } from "./PreSignBreakdown";
 export { default as PerformanceCharts } from "./PerformanceCharts";
 export { default as TransactionHistory } from "./TransactionHistory";
 export { default as VaultActions } from "./VaultActions";
