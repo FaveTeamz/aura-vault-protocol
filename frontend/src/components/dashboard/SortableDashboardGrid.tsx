@@ -264,7 +264,7 @@ export function SortableDashboardGrid() {
       const visibleIter = reorderedVisible[Symbol.iterator]();
       const next = widgets.map((w) =>
         w.visible ? visibleIter.next().value : w
-      );
+      ).filter((w): w is import("@/lib/useWidgetLayout").WidgetDescriptor => w !== undefined);
 
       setOrder(next);
 

@@ -20,3 +20,4 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
+export { OnboardingTour, useRestartTour } from "./OnboardingTour";

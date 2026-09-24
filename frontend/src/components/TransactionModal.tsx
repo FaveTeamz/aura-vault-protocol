@@ -10,6 +10,8 @@ type TxStatus = "idle" | "pending" | "success" | "error";
 interface Props {
   type: TxType;
   balance: string;
+  sharePrice?: string;
+  sharePriceUpdatedAt?: number;
   onClose: () => void;
 }
 

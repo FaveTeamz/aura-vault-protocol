@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingChecklist";
 import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
 
-type WalletType = "freighter" | "metamask" | "xBull";
+type WalletType = "freighter" | "metamask" | "xBull" | "coinbase";
 
 type WalletState = {
   type: WalletType;
@@ -134,20 +134,6 @@ export default function WalletConnect({
         onConnected?.();
         return;
       }
-      const address = (await api.getPublicKey()) as string;
-      const network = (await api.getNetwork()) as string;
-      const state: WalletState = {
-        address,
-        network: network.toUpperCase(),
-        connected: true,
-        walletType: "freighter",
-      };
-
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "freighter");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -192,14 +178,10 @@ export default function WalletConnect({
 
       const state: WalletState = {
         address: accounts[0],
-        network: networkName,
-        connected: true,
-        walletType: "metamask",
+        type: "metamask",
       };
 
       setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "metamask");
       markComplete("connect_wallet");
       setShowDropdown(false);
     } catch (err: unknown) {
@@ -235,14 +217,10 @@ export default function WalletConnect({
 
       const state: WalletState = {
         address: accounts[0],
-        network: "ETHEREUM",
-        connected: true,
-        walletType: "coinbase",
+        type: "coinbase",
       };
 
       setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "coinbase");
       markComplete("connect_wallet");
       setShowDropdown(false);
     } catch (err: unknown) {
