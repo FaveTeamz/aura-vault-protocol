@@ -17,6 +17,9 @@ type WalletConnectProps = {
   onDisconnected?: () => void;
 };
 
+const STORAGE_KEY = "aura_wallet_state";
+const LAST_WALLET_KEY = "aura_last_wallet";
+
 function truncate(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
@@ -134,20 +137,6 @@ export default function WalletConnect({
         onConnected?.();
         return;
       }
-      const address = (await api.getPublicKey()) as string;
-      const network = (await api.getNetwork()) as string;
-      const state: WalletState = {
-        address,
-        network: network.toUpperCase(),
-        connected: true,
-        walletType: "freighter",
-      };
-
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "freighter");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -191,10 +180,8 @@ export default function WalletConnect({
       const networkName = chainId === "0x1" ? "ETHEREUM" : "TESTNET";
 
       const state: WalletState = {
+        type: "metamask",
         address: accounts[0],
-        network: networkName,
-        connected: true,
-        walletType: "metamask",
       };
 
       setWallet(state);
@@ -234,10 +221,8 @@ export default function WalletConnect({
       })) as string[];
 
       const state: WalletState = {
+        type: "metamask", // Coinbase uses MetaMask-compatible provider
         address: accounts[0],
-        network: "ETHEREUM",
-        connected: true,
-        walletType: "coinbase",
       };
 
       setWallet(state);

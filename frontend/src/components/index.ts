@@ -7,6 +7,7 @@ export { default as VaultActions } from "./VaultActions";
 export { default as FAQPage } from "./FAQPage";
 export { default as LazyImage } from "./LazyImage";
 export { default as PageTransition } from "./PageTransition";
+export { default as ProgressBar } from "./ProgressBar";
 
 // Named exports
 export { ThemeToggle } from "./ThemeToggle";
@@ -20,3 +21,4 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
+export { startProgress, doneProgress } from "./ProgressBar";
