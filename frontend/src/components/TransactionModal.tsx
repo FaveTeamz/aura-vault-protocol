@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { useToast } from "./toast";
 
 type TxType = "deposit" | "withdraw";
 type Step = 1 | 2 | 3;
@@ -29,6 +30,7 @@ function Spinner() {
 }
 
 export default function TransactionModal({ type, balance, onClose }: Props) {
+  const { info, txSuccess, error: toastError } = useToast();
   const [step, setStep] = useState<Step>(1);
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
@@ -114,6 +116,8 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
     if (!retrying) {
       setStatus("pending");
       setTxError("");
+      // Toast: transaction submitted
+      info(`${label} submitted`, "Waiting for wallet confirmation…");
     }
 
     try {
@@ -129,9 +133,14 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
         throw new Error(data.error || "Transaction failed");
       }
 
-      setTxHash(data.hash || `tx-${Date.now()}`);
+      const hash: string = data.hash || `tx-${Date.now()}`;
+      setTxHash(hash);
       setStatus("success");
       setRetryCount(0);
+
+      // Toast: transaction confirmed — includes "View on Explorer" link
+      const explorerUrl = `https://stellar.expert/explorer/testnet/tx/${hash}`;
+      txSuccess(`${label} confirmed!`, explorerUrl, `Amount: ${amount} XLM`);
     } catch (err: unknown) {
       const errorMsg = (err instanceof Error ? err.message : "Transaction failed") ?? "Transaction failed";
       setTxError(errorMsg);
@@ -140,6 +149,9 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
       if (retrying) {
         setRetryCount((prev) => prev + 1);
       }
+
+      // Toast: transaction failed — error variant persists until dismissed
+      toastError(`${label} failed`, errorMsg);
     }
   }
 

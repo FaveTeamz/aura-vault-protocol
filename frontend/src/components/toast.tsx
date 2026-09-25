@@ -12,7 +12,7 @@
  * - "View on Explorer" action link in tx-success toasts
  */
 
-import {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -291,7 +291,7 @@ function IconInfo() {
   );
 }
 
-const ICONS: Record<ToastVariant, () => JSX.Element> = {
+const ICONS: Record<ToastVariant, () => React.ReactElement> = {
   success: IconSuccess,
   error: IconError,
   warning: IconWarning,
