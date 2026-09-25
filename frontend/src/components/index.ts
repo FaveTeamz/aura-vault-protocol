@@ -1,4 +1,5 @@
 // Default exports
+export { default as NavHeader } from "./NavHeader";
 export { default as WalletConnect } from "./WalletConnect";
 
 // Empty states
