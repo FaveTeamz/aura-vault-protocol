@@ -1,6 +1,13 @@
 // Default exports
 export { default as WalletConnect } from "./WalletConnect";
 
+// Freighter network mismatch — #248
+export {
+  FreighterNetworkProvider,
+  FreighterNetworkBanner,
+  useNetworkMismatch,
+} from "./FreighterNetworkBanner";
+
 // Empty states
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps, EmptyVariant } from "./EmptyState";
