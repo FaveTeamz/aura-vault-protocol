@@ -9,7 +9,7 @@ export interface DashboardCardProps {
   /** Optional heading rendered inside the card header area */
   title?: string;
   /** Optional sub-label rendered beneath the title */
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   /** Visual hierarchy variant */
   variant?: CardVariant;
   /** Additional className forwarded to the root element */

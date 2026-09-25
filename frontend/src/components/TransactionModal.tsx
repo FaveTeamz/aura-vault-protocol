@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { ExplorerMenu } from "./ExplorerMenu";
 
 type TxType = "deposit" | "withdraw";
 type Step = 1 | 2 | 3;
@@ -362,12 +363,12 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
                 </p>
                 <p className="text-xs text-zinc-500">
                   Tx:{" "}
-                  <span
+                  <ExplorerMenu
                     data-cy="modal-tx-hash"
-                    className="font-mono"
-                  >
-                    {txHash.slice(0, 16)}…
-                  </span>
+                    value={txHash}
+                    type="tx"
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
+                  />
                 </p>
                 <button
                   onClick={onClose}

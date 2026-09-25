@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { ExplorerMenu } from "./ExplorerMenu";
+import { resolveNetwork, type StellarNetwork } from "@/lib/explorerLinks";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +19,14 @@ export interface Transaction {
 
 export interface TransactionHistoryProps {
   transactions: Transaction[];
-  explorerBase?: string; // e.g. "https://stellar.expert/explorer/testnet/tx"
+  /**
+   * @deprecated Pass `network` instead. Kept for backwards compatibility.
+   * When `explorerBase` is provided and `network` is omitted, network is
+   * inferred from `explorerBase` (contains "mainnet" → "mainnet", else "testnet").
+   */
+  explorerBase?: string;
+  /** Stellar network for explorer links. Defaults to NEXT_PUBLIC_STELLAR_NETWORK → "testnet". */
+  network?: StellarNetwork;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -54,8 +63,13 @@ function parseAmount(s: string): number {
 
 export default function TransactionHistory({
   transactions,
-  explorerBase = "https://stellar.expert/explorer/testnet/tx",
+  explorerBase,
+  network,
 }: TransactionHistoryProps) {
+  // Resolve network: explicit prop → infer from legacy explorerBase → env var
+  const resolvedNetwork: StellarNetwork = network
+    ?? (explorerBase?.includes("mainnet") ? "mainnet" : undefined)
+    ?? resolveNetwork();
   // Filters
   const [typeFilter, setTypeFilter] = useState<TxType>("all");
   const [statusFilter, setStatusFilter] = useState<TxStatus>("all");
@@ -307,15 +321,12 @@ export default function TransactionHistory({
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    <a
-                      href={`${explorerBase}/${tx.hash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-sm text-blue-600 hover:underline dark:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-                      aria-label={`View transaction ${tx.hash} on block explorer`}
-                    >
-                      {shortHash(tx.hash)}
-                    </a>
+                    <ExplorerMenu
+                      value={tx.hash}
+                      type="tx"
+                      network={resolvedNetwork}
+                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    />
                   </td>
                 </tr>
               ))

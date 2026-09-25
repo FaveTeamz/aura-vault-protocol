@@ -20,3 +20,5 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
+export { ExplorerMenu } from "./ExplorerMenu";
+export type { ExplorerMenuProps } from "./ExplorerMenu";
