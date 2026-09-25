@@ -23,7 +23,8 @@ export const metadata: Metadata = {
 };
 
 // Inline script runs before React hydration to prevent theme flash.
-const noFlashScript = `(function(){try{var t=localStorage.getItem('aura_theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
+// Must use the same localStorage key as ThemeProvider: "aura-theme"
+const noFlashScript = `(function(){try{var t=localStorage.getItem('aura-theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 export default function RootLayout({
   children,
