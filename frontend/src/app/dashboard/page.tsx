@@ -1,22 +1,36 @@
 "use client";
 
-import { SortableDashboardGrid } from "@/components/dashboard/SortableDashboardGrid";
-import PerformanceCharts from "@/components/PerformanceCharts";
+import dynamic from "next/dynamic";
 
 /**
  * /dashboard — main vault overview page.
  *
- * Issue #498: uses SortableDashboardGrid which supports:
- *  - Drag-and-drop widget reordering (@dnd-kit/sortable)
- *  - Keyboard reordering (arrow keys on grip handle)
- *  - Widget visibility controlled from /settings
- *  - Layout persisted to localStorage
- *  - Smooth 60fps drag animation via CSS transform + DragOverlay
+ * Code-split routes with dynamic imports to enforce bundle size budgets.
  */
+const DashboardGrid = dynamic(
+  () => import("@/components/dashboard/DashboardGrid").then((mod) => mod.DashboardGrid),
+  {
+    loading: () => (
+      <div className="h-96 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
+    ),
+    ssr: true,
+  }
+);
+
+const PerformanceCharts = dynamic(
+  () => import("@/components/PerformanceCharts"),
+  {
+    loading: () => (
+      <div className="h-72 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
+    ),
+    ssr: false, // Charts are client-side canvas visualization
+  }
+);
+
 export default function DashboardPage() {
   return (
     <div className="space-y-8">
-      <SortableDashboardGrid />
+      <DashboardGrid />
       <PerformanceCharts />
     </div>
   );
