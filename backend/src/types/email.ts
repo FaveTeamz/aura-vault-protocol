@@ -5,6 +5,7 @@ export type EmailTemplate =
   | 'security-alert'
   | 'welcome'
   | 'gdpr-erasure-confirmation'
+  | 'gdpr-data-export-ready'
   | 'portfolio-digest';
 
 export type EmailPriority = 'high' | 'normal' | 'low';

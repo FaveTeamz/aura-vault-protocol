@@ -4,7 +4,16 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type EventType = "deposit" | "withdraw" | "harvest" | "pause" | "unpause" | "upgrade" | "suspicious";
+export type EventType =
+  | "deposit"
+  | "withdraw"
+  | "harvest"
+  | "pause"
+  | "unpause"
+  | "vault.paused"
+  | "vault.unpaused"
+  | "upgrade"
+  | "suspicious";
 
 export interface WebhookEndpoint {
   id: string;
@@ -112,7 +121,15 @@ async function attemptDelivery(delivery: DeliveryRecord, endpoint: WebhookEndpoi
 }
 
 function scheduleNextRetry(delivery: DeliveryRecord, endpoint: WebhookEndpoint, event: WebhookEvent): void {
-  const delay = BACKOFF_MS[Math.min(delivery.attempts - 1, BACKOFF_MS.length - 1)];
+  const isPauseEvent = event.type === "vault.paused" || event.type === "vault.unpaused";
+  if (isPauseEvent && delivery.attempts >= 4) {
+    delivery.status = "failed";
+    delivery.nextRetryAt = null;
+    return;
+  }
+  const delay = isPauseEvent
+    ? 1_000 * 2 ** (delivery.attempts - 1)
+    : BACKOFF_MS[Math.min(delivery.attempts - 1, BACKOFF_MS.length - 1)];
   const createdAt = new Date(delivery.createdAt).getTime();
   if (Date.now() + delay - createdAt > MAX_RETRY_MS) {
     delivery.status      = "failed";
