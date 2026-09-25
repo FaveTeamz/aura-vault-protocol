@@ -19,7 +19,36 @@ export { default as VaultHealthScore } from "./VaultHealthScore";
 export { VaultComparison, type VaultInfo, type VaultComparisonProps } from "./VaultComparison";
 export { ThemeToggle } from "./ThemeToggle";
 export { LanguageSwitcher } from "./LanguageSwitcher";
-export { Skeleton } from "./Skeleton";
+// Skeleton loading states (#252)
+export {
+  Skeleton,
+  StatCardSkeleton,
+  PortfolioPanelSkeleton,
+  TxHistoryTableSkeleton,
+  TransactionRowSkeleton,
+  SharePriceChartSkeleton,
+  VaultCardSkeleton,
+  DashboardSkeleton,
+} from "./Skeleton";
+
+// Accessible form components (#251)
+export {
+  FormLabel,
+  FormErrorMessage,
+  FormHint,
+  FormField,
+  AmountInput,
+  AddressInput,
+  ShareInput,
+  TextareaField,
+  AccessibleModal,
+} from "./AccessibleFormComponents";
+
+// Deposit modal (#237)
+export { DepositModal } from "./DepositModal";
+
+// Withdraw modal (#238)
+export { WithdrawModal } from "./WithdrawModal";
 export { ThemeProvider, useTheme } from "./ThemeProvider";
 export { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 export {

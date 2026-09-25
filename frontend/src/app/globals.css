@@ -181,6 +181,35 @@ body {
   to   { transform: scale(1); opacity: 1; }
 }
 
+/* ── Skeleton loading placeholder (#252) ── */
+/*
+ * .skeleton provides the shimmer pulse animation for all skeleton components.
+ * Background-size 200% enables the left-to-right shimmer sweep.
+ * Uses CSS custom properties so it automatically respects light / dark mode.
+ */
+.skeleton {
+  display: block;
+  border-radius: 0.375rem; /* rounded-md */
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base)    25%,
+    var(--skeleton-shine)   50%,
+    var(--skeleton-base)    75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+:root {
+  --skeleton-base:  #e5e7eb; /* zinc-200 */
+  --skeleton-shine: #f3f4f6; /* zinc-100 */
+}
+
+.dark {
+  --skeleton-base:  #27272a; /* zinc-800 */
+  --skeleton-shine: #3f3f46; /* zinc-700 */
+}
+
 /* ── Utility classes ── */
 .animate-fade-in        { animation: fade-in        350ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 .animate-fade-out       { animation: fade-out       300ms cubic-bezier(0.4, 0, 0.2, 1) both; }
