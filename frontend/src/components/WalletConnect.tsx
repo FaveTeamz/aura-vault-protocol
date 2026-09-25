@@ -1,287 +1,355 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { ChevronDown } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { ChevronDown, Wallet, ExternalLink, RefreshCw } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingChecklist";
-import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
+import {
+  WalletSelectionModal,
+  type SupportedWalletId,
+  type WalletInfo,
+} from "./WalletSelectionModal";
 
-type WalletType = "freighter" | "metamask" | "xBull";
+export type WalletType = SupportedWalletId;
 
-type WalletState = {
+export interface WalletState {
   type: WalletType;
   address: string;
-};
+  network: string;
+  connected: boolean;
+}
 
-type WalletConnectProps = {
+export interface WalletConnectProps {
   onConnected?: () => void;
   onDisconnected?: () => void;
-};
+}
 
-function truncate(address: string) {
+const STORAGE_KEY = "aura_wallet_state";
+const LAST_WALLET_KEY = "aura_last_wallet";
+
+export function truncate(address: string): string {
+  if (!address || address.length <= 10) return address || "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function getInstalledWallets(): WalletType[] {
+/**
+ * Supported wallet definitions with metadata and install instructions
+ */
+export const SUPPORTED_WALLETS_METADATA: Record<
+  SupportedWalletId,
+  {
+    name: string;
+    description: string;
+    installUrl: string;
+    installInstructions: string;
+  }
+> = {
+  freighter: {
+    name: "Freighter",
+    description: "Official Stellar browser extension wallet by SDF",
+    installUrl: "https://www.freighter.app/",
+    installInstructions:
+      "Install the Freighter extension from freighter.app, create or import your account, then click connect.",
+  },
+  lobstr: {
+    name: "Lobstr",
+    description: "Leading mobile & web wallet for the Stellar network",
+    installUrl: "https://lobstr.co/",
+    installInstructions:
+      "Install the Lobstr Signer extension or mobile app from lobstr.co, log in, then click connect.",
+  },
+  xbull: {
+    name: "xBull",
+    description: "Privacy-focused powerful wallet for Stellar & Soroban",
+    installUrl: "https://xbull.app/",
+    installInstructions:
+      "Install the xBull extension from xbull.app, unlock your wallet, then click connect.",
+  },
+};
+
+/**
+ * Detect which wallets are installed in the browser environment
+ */
+export function detectInstalledWallets(): Record<SupportedWalletId, boolean> {
   if (typeof window === "undefined") {
-    return [];
+    return { freighter: false, lobstr: false, xbull: false };
   }
 
-  const wallets: WalletType[] = [];
-
-  const win = window as Window & {
+  const win = window as unknown as {
     freighterApi?: unknown;
-    ethereum?: unknown;
+    freighter?: unknown;
+    lobstr?: unknown;
+    lobstrSignerExtension?: unknown;
     xBullSDK?: unknown;
+    xbull?: unknown;
   };
 
-  if (win.freighterApi) wallets.push("freighter");
-  if (win.ethereum) wallets.push("metamask");
-  if (win.xBullSDK) wallets.push("xBull");
+  return {
+    freighter: Boolean(win.freighterApi || win.freighter),
+    lobstr: Boolean(win.lobstr || win.lobstrSignerExtension),
+    xbull: Boolean(win.xBullSDK || win.xbull),
+  };
+}
 
-  return wallets;
+/**
+ * Consistent wallet connection using Stellar Wallets Kit with graceful fallback
+ */
+export async function connectViaStellarWalletsKit(
+  walletId: SupportedWalletId
+): Promise<{ address: string; network: string; usedFallback?: boolean }> {
+  let kitModule: any = null;
+
+  try {
+    // Dynamic import to maintain safe SSR and kit availability resilience
+    kitModule = await import("@creit-tech/stellar-wallets-kit");
+  } catch {
+    try {
+      kitModule = await import("@creit.tech/stellar-wallets-kit");
+    } catch {
+      kitModule = null;
+    }
+  }
+
+  // If Stellar Wallets Kit is available, attempt to connect through it
+  if (kitModule && kitModule.StellarWalletsKit) {
+    try {
+      const { StellarWalletsKit } = kitModule;
+
+      // Kit wallet ID mapping
+      const kitIdMap: Record<SupportedWalletId, string> = {
+        freighter: "freighter",
+        lobstr: "lobstr",
+        xbull: "xbull",
+      };
+
+      if (typeof StellarWalletsKit.setWallet === "function") {
+        StellarWalletsKit.setWallet(kitIdMap[walletId]);
+      }
+
+      if (typeof StellarWalletsKit.getAddress === "function") {
+        const res = await StellarWalletsKit.getAddress();
+        const address = typeof res === "string" ? res : res?.address;
+        if (address) {
+          return { address, network: "TESTNET", usedFallback: false };
+        }
+      }
+    } catch (kitErr) {
+      console.warn("StellarWalletsKit error, falling back to direct extension:", kitErr);
+    }
+  }
+
+  // Graceful fallback: Direct browser extension API connection
+  if (typeof window === "undefined") {
+    throw new Error("Window object is not available.");
+  }
+
+  const win = window as any;
+
+  if (walletId === "freighter") {
+    const api = win.freighterApi || win.freighter;
+    if (!api) {
+      throw new Error(
+        "Freighter is not installed. Please install Freighter from https://www.freighter.app/"
+      );
+    }
+    let address: string | undefined;
+    if (api.requestAccess) {
+      const access = await api.requestAccess();
+      address = typeof access === "string" ? access : access?.address;
+    }
+    if (!address && api.getPublicKey) {
+      address = await api.getPublicKey();
+    }
+    if (!address) {
+      throw new Error("Freighter connection was cancelled or returned no public key.");
+    }
+    return { address, network: "TESTNET", usedFallback: true };
+  }
+
+  if (walletId === "lobstr") {
+    const lobstr = win.lobstr || win.lobstrSignerExtension;
+    if (!lobstr) {
+      throw new Error(
+        "Lobstr is not installed. Please install Lobstr from https://lobstr.co/"
+      );
+    }
+    let address: string | undefined;
+    if (lobstr.getPublicKey) {
+      address = await lobstr.getPublicKey();
+    } else if (lobstr.isConnected && lobstr.requestAccess) {
+      const res = await lobstr.requestAccess();
+      address = typeof res === "string" ? res : res?.address;
+    }
+    if (!address) {
+      throw new Error("Lobstr connection returned no public key.");
+    }
+    return { address, network: "TESTNET", usedFallback: true };
+  }
+
+  if (walletId === "xbull") {
+    const xbull = win.xBullSDK || win.xbull;
+    if (!xbull) {
+      throw new Error(
+        "xBull is not installed. Please install xBull from https://xbull.app/"
+      );
+    }
+    let address: string | undefined;
+    if (xbull.getPublicKey) {
+      address = await xbull.getPublicKey();
+    } else if (xbull.connect) {
+      const res = await xbull.connect();
+      address = typeof res === "string" ? res : res?.address;
+    }
+    if (!address) {
+      throw new Error("xBull connection returned no public key.");
+    }
+    return { address, network: "TESTNET", usedFallback: true };
+  }
+
+  throw new Error(`Unsupported wallet type: ${walletId}`);
 }
 
 export default function WalletConnect({
   onConnected,
   onDisconnected,
 }: WalletConnectProps) {
-  const [wallets, setWallets] = useState<WalletType[]>([]);
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [connectingId, setConnectingId] = useState<SupportedWalletId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [installedWallets, setInstalledWallets] = useState<WalletType[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [installedMap, setInstalledMap] = useState<Record<SupportedWalletId, boolean>>({
+    freighter: false,
+    lobstr: false,
+    xbull: false,
+  });
+  const [isKitFallback, setIsKitFallback] = useState(false);
 
   const { markComplete } = useOnboarding();
 
-  const detectWallets = useCallback(() => {
-    setWallets(getInstalledWallets());
+  // Refresh installed wallets status
+  const refreshInstalledWallets = useCallback(() => {
+    setInstalledMap(detectInstalledWallets());
   }, []);
 
+  // Hydration-safe initial load of wallet state and installed detection
   useEffect(() => {
-    detectWallets();
-  }, [detectWallets]);
+    refreshInstalledWallets();
 
-  async function connectWallet(type: WalletType) {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.connected && parsed?.address) {
+            setWallet(parsed);
+          }
+        }
+      } catch {
+        // ignore corrupt local storage
+      }
+    }
+  }, [refreshInstalledWallets]);
+
+  // Handle wallet connection selection
+  const handleSelectWallet = async (walletId: SupportedWalletId) => {
     setLoading(true);
+    setConnectingId(walletId);
     setError(null);
 
     try {
-      if (type === "metamask") {
-        const win = window as Window & {
-          ethereum?: {
-            request: (args: {
-              method: string;
-            }) => Promise<string[]>;
-          };
-        };
+      const { address, network, usedFallback } =
+        await connectViaStellarWalletsKit(walletId);
 
-        if (!win.ethereum) {
-          throw new Error("MetaMask is not installed.");
-        }
-
-        const accounts = await win.ethereum.request({
-          method: "eth_requestAccounts",
-        });
-
-        if (!accounts.length) {
-          throw new Error("No MetaMask account was returned.");
-        }
-
-        setWallet({
-          type,
-          address: accounts[0],
-        });
-
-        onConnected?.();
-        return;
+      if (usedFallback) {
+        setIsKitFallback(true);
       }
 
-      if (type === "freighter") {
-        const win = window as Window & {
-          freighterApi?: {
-            requestAccess?: () => Promise<{
-              address?: string;
-            }>;
-            getPublicKey?: () => Promise<string>;
-          };
-        };
-
-        if (!win.freighterApi) {
-          throw new Error("Freighter is not installed.");
-        }
-
-        let address: string | undefined;
-
-        if (win.freighterApi.requestAccess) {
-          const result = await win.freighterApi.requestAccess();
-          address = result.address;
-        }
-
-        if (!address && win.freighterApi.getPublicKey) {
-          address = await win.freighterApi.getPublicKey();
-        }
-
-        if (!address) {
-          throw new Error("No Freighter address was returned.");
-        }
-
-        setWallet({
-          type,
-          address,
-        });
-
-        onConnected?.();
-        return;
-      }
-      const address = (await api.getPublicKey()) as string;
-      const network = (await api.getNetwork()) as string;
-      const state: WalletState = {
+      const nextState: WalletState = {
+        type: walletId,
         address,
         network: network.toUpperCase(),
         connected: true,
-        walletType: "freighter",
       };
 
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "freighter");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to connect to Freighter"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+      setWallet(nextState);
 
-  function disconnectWallet() {
-    setWallet(null);
-    setError(null);
-    onDisconnected?.();
-  }
-
-  const connectMetaMask = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      const w = window as unknown as Record<string, unknown>;
-      const ethereum = w.ethereum as
-        | Record<string, (...args: unknown[]) => Promise<unknown>>
-        | undefined;
-
-      if (!ethereum) {
-        setError("MetaMask not found. Please install the extension.");
-        return;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+        localStorage.setItem(LAST_WALLET_KEY, walletId);
       }
 
-      const accounts = (await ethereum.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-
-      const chainId = (await ethereum.request({
-        method: "eth_chainId",
-      })) as string;
-
-      const networkName = chainId === "0x1" ? "ETHEREUM" : "TESTNET";
-
-      const state: WalletState = {
-        address: accounts[0],
-        network: networkName,
-        connected: true,
-        walletType: "metamask",
-      };
-
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "metamask");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
+      markComplete?.("connect_wallet");
+      setIsModalOpen(false);
+      onConnected?.();
     } catch (err: unknown) {
-      setError(
+      const msg =
         err instanceof Error
           ? err.message
-          : "Failed to connect to MetaMask"
-      );
+          : `Failed to connect to ${SUPPORTED_WALLETS_METADATA[walletId].name}`;
+      setError(msg);
     } finally {
       setLoading(false);
+      setConnectingId(null);
     }
-  }, [markComplete]);
+  };
 
-  const connectCoinbase = useCallback(async () => {
+  const disconnectWallet = () => {
+    setWallet(null);
     setError(null);
-    setLoading(true);
-
-    try {
-      const { CoinbaseWalletSDK } = await import(
-        "@coinbase/wallet-sdk"
-      );
-
-      const coinbaseWallet = new CoinbaseWalletSDK({
-        appName: "Aura Vault Protocol",
-        appLogoUrl: "/logo.png",
-      });
-
-      const provider = coinbaseWallet.makeWeb3Provider();
-
-      const accounts = (await provider.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-
-      const state: WalletState = {
-        address: accounts[0],
-        network: "ETHEREUM",
-        connected: true,
-        walletType: "coinbase",
-      };
-
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "coinbase");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to connect to Coinbase Wallet"
-      );
-    } finally {
-      setLoading(false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LAST_WALLET_KEY);
     }
-  }, [markComplete]);
+    onDisconnected?.();
+  };
 
+  // Prepare wallet list for modal
+  const walletList: WalletInfo[] = (["freighter", "lobstr", "xbull"] as SupportedWalletId[]).map(
+    (id) => ({
+      id,
+      name: SUPPORTED_WALLETS_METADATA[id].name,
+      description: SUPPORTED_WALLETS_METADATA[id].description,
+      installUrl: SUPPORTED_WALLETS_METADATA[id].installUrl,
+      installInstructions: SUPPORTED_WALLETS_METADATA[id].installInstructions,
+      isInstalled: installedMap[id] ?? false,
+    })
+  );
+
+  // If connected, render connected state
   if (wallet) {
+    const meta = SUPPORTED_WALLETS_METADATA[wallet.type];
     return (
-      <div className="flex flex-col gap-3 rounded-lg border p-4">
-        <div>
-          <p className="text-sm font-medium">Connected Wallet</p>
-
-          <p
-            data-testid="wallet-address"
-            className="text-sm text-gray-500"
-          >
-            {wallet.type}: {truncate(wallet.address)}
-          </p>
-
-          <p
+      <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 font-bold text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+              {meta ? meta.name.charAt(0) : "W"}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                Connected ({meta?.name || wallet.type})
+              </p>
+              <p
+                data-testid="wallet-address"
+                className="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100"
+              >
+                {truncate(wallet.address)}
+              </p>
+            </div>
+          </div>
+          <span
             data-testid="network-badge"
-            className="text-xs font-semibold text-emerald-600"
+            className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
           >
-            TESTNET
-          </p>
+            {wallet.network || "TESTNET"}
+          </span>
         </div>
 
         <button
           data-testid="disconnect-wallet-btn"
           type="button"
           onClick={disconnectWallet}
-          className="rounded-md border px-4 py-2 text-sm"
+          className="mt-1 rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
         >
           Disconnect
         </button>
@@ -289,168 +357,49 @@ export default function WalletConnect({
     );
   }
 
+  // Disconnected state: trigger modal button
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-4">
-      <div>
-        <p className="text-sm font-medium">Connect Wallet</p>
-
-        <p className="text-sm text-gray-500">
-          Select an installed wallet.
-        </p>
-      </div>
-
-      {wallets.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          No supported wallet detected.
-        </p>
-      ) : (
-        wallets.map((type) => (
-          <button
-            key={type}
-            data-testid="connect-wallet-btn"
-            type="button"
-            onClick={() => connectWallet(type)}
-            disabled={loading}
-            className="rounded-md border px-4 py-2 text-sm disabled:opacity-50"
-          >
-            {loading ? "Connecting..." : `Connect ${type}`}
-          </button>
-        ))
-      )}
-
-      {error && (
-        <p className="text-sm text-red-500" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function PortfolioSection({ address }: { address: string }) {
-  const [data, setData] = useState<{
-    totalAssets: string;
-    shareBalance: string;
-    pricePerShare: string;
-  } | null>(null);
-
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    setRefreshing(true);
-
-    try {
-      const [assetsRes, balanceRes] = await Promise.all([
-        fetch("/api/vault/total_assets"),
-        fetch(
-          `/api/vault/balance_of?address=${encodeURIComponent(address)}`
-        ),
-      ]);
-
-      const assets = assetsRes.ok
-        ? await assetsRes.json()
-        : { total: "0" };
-
-      const balance = balanceRes.ok
-        ? await balanceRes.json()
-        : { balance: "0" };
-
-      const total = BigInt(assets.total ?? 0);
-      const shares = BigInt(balance.balance ?? 0);
-
-      const pps =
-        total > 0n && shares > 0n
-          ? ((total * 10000n) / shares).toString()
-          : "10000";
-
-      setData({
-        totalAssets: assets.total ?? "0",
-        shareBalance: balance.balance ?? "0",
-        pricePerShare: pps,
-      });
-    } catch {
-      setData({
-        totalAssets: "—",
-        shareBalance: "—",
-        pricePerShare: "—",
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [address]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return (
-    <section
-      data-cy="portfolio-section"
-      className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          Portfolio
-        </h2>
+    <>
+      <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Connect Wallet
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Connect with Freighter, Lobstr, or xBull via Stellar Wallets Kit.
+          </p>
+        </div>
 
         <button
-          data-cy="refresh-btn"
-          onClick={load}
-          disabled={refreshing}
-          className="text-xs text-zinc-500 hover:text-zinc-800 disabled:opacity-50 dark:hover:text-zinc-200"
+          data-testid="connect-wallet-btn"
+          type="button"
+          onClick={() => {
+            refreshInstalledWallets();
+            setIsModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
         >
-          {refreshing ? "Refreshing…" : "↻ Refresh"}
+          <Wallet size={16} />
+          Connect Wallet
         </button>
+
+        {error && (
+          <p className="text-xs text-red-500" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
-      <dl className="grid grid-cols-3 gap-4 text-center">
-        <div>
-          <dt className="mb-1 text-xs text-zinc-500">
-            Total Vault Assets
-          </dt>
-
-          <dd
-            data-cy="total-assets"
-            className="font-mono text-sm font-semibold"
-          >
-            {data?.totalAssets ?? "—"}
-          </dd>
-        </div>
-
-        <div>
-          <dt className="mb-1 text-xs text-zinc-500">
-            Your Shares
-          </dt>
-
-          <dd
-            data-cy="share-balance"
-            className="font-mono text-sm font-semibold"
-          >
-            {data?.shareBalance && data?.pricePerShare ? (
-              <ShareBalanceDisplay
-                shares={data.shareBalance}
-                sharePrice={data.pricePerShare}
-                variant="compact"
-              />
-            ) : (
-              data?.shareBalance ?? "—"
-            )}
-          </dd>
-        </div>
-
-        <div>
-          <dt className="mb-1 text-xs text-zinc-500">
-            Price / Share
-          </dt>
-
-          <dd
-            data-cy="price-per-share"
-            className="font-mono text-sm font-semibold"
-          >
-            {data?.pricePerShare ?? "—"}
-          </dd>
-        </div>
-      </dl>
-    </section>
+      <WalletSelectionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        wallets={walletList}
+        onSelectWallet={handleSelectWallet}
+        isConnecting={loading}
+        connectingWalletId={connectingId}
+        errorMessage={error}
+        kitFallbackActive={isKitFallback}
+      />
+    </>
   );
 }
