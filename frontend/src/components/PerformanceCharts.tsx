@@ -125,8 +125,14 @@ export default function PerformanceCharts() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === "aura_wallet_state") checkWallet();
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", onStorage);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", onStorage);
+      }
+    };
   }, []);
 
   const fetchPerformanceData = useCallback(async (p: TimePeriod) => {
@@ -153,6 +159,7 @@ export default function PerformanceCharts() {
 
   function downloadCSV() {
     if (!data) return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
     const csv = toCSV(data);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);

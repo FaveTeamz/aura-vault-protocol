@@ -5,11 +5,17 @@ import { ChevronDown } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingChecklist";
 import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
 
-type WalletType = "freighter" | "metamask" | "xBull";
+type WalletType = "freighter" | "metamask" | "xBull" | "coinbase" | "walletconnect";
 
-type WalletState = {
-  type: WalletType;
-  address: string;
+const STORAGE_KEY = "aura_wallet_state";
+const LAST_WALLET_KEY = "aura_last_wallet_type";
+
+export type WalletState = {
+  type?: WalletType;
+  address?: string | null;
+  network?: string | null;
+  connected?: boolean;
+  walletType?: WalletType | string | null;
 };
 
 type WalletConnectProps = {
@@ -17,7 +23,8 @@ type WalletConnectProps = {
   onDisconnected?: () => void;
 };
 
-function truncate(address: string) {
+function truncate(address?: string | null) {
+  if (!address) return "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
@@ -58,8 +65,21 @@ export default function WalletConnect({
     setWallets(getInstalledWallets());
   }, []);
 
+  // Hydration-safe: Detect wallets and restore persisted wallet state on client mount only
   useEffect(() => {
     detectWallets();
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.address || parsed.connected)) {
+          setWallet(parsed);
+        }
+      }
+    } catch {
+      // Ignore storage errors in restricted iframe/private mode
+    }
   }, [detectWallets]);
 
   async function connectWallet(type: WalletType) {
@@ -126,28 +146,28 @@ export default function WalletConnect({
           throw new Error("No Freighter address was returned.");
         }
 
-        setWallet({
+        const state: WalletState = {
           type,
           address,
-        });
+          connected: true,
+          walletType: type,
+        };
 
+        setWallet(state);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(LAST_WALLET_KEY, type);
+          } catch {
+            // Ignore storage errors
+          }
+        }
+        markComplete("connect_wallet");
+        setShowDropdown(false);
         onConnected?.();
         return;
       }
-      const address = (await api.getPublicKey()) as string;
-      const network = (await api.getNetwork()) as string;
-      const state: WalletState = {
-        address,
-        network: network.toUpperCase(),
-        connected: true,
-        walletType: "freighter",
-      };
 
-      setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "freighter");
-      markComplete("connect_wallet");
-      setShowDropdown(false);
     } catch (err: unknown) {
       setError(
         err instanceof Error
@@ -162,6 +182,14 @@ export default function WalletConnect({
   function disconnectWallet() {
     setWallet(null);
     setError(null);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LAST_WALLET_KEY);
+      } catch {
+        // ignore
+      }
+    }
     onDisconnected?.();
   }
 

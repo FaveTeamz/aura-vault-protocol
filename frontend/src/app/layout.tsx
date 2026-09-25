@@ -11,19 +11,25 @@ export const metadata: Metadata = {
   description: "Aura Vault Protocol",
 };
 
- export default function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-        <html
+    /*
+      suppressHydrationWarning is strictly necessary on <html> because ThemeProvider and LanguageSwitcher
+      dynamically modify the root html element's class ("dark") and attributes ("lang", "dir") on the client
+      based on localStorage and system color scheme preferences (prefers-color-scheme).
+      Next.js and React specifically recommend suppressHydrationWarning for <html> in themes/i18n to prevent
+      root-level attribute mismatch warnings while preserving full hydration validation for children.
+    */
+    <html
       lang="en"
       dir="ltr"
       className="h-full antialiased"
       suppressHydrationWarning
     >
-
       <body className="min-h-full flex flex-col bg-white text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100">
         <ThemeProvider>
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
@@ -59,4 +65,3 @@ export const metadata: Metadata = {
     </html>
   );
 }
-
