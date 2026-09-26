@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./print.css";
 
 /* ── Light mode tokens ── */
 :root {

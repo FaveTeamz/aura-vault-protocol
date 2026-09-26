@@ -8,6 +8,7 @@ import { FinancialValue } from "./FinancialValue";
 import { EmptyState } from "./EmptyState";
 import { AnimatedShareBalance } from "./AnimatedShareBalance";
 import { useAnimatedNumber } from "@/lib/useAnimatedNumber";
+import { PrintPortfolioButton } from "./PrintPortfolioButton";
 
 interface VaultStats {
   tvl: string;
@@ -263,7 +264,10 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
   };
 
   return (
-    <main className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
+    <main
+      className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8"
+      data-print="portfolio-root"
+    >
       <div
         role="status"
         aria-live="polite"
@@ -275,9 +279,14 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
 
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Vault Dashboard
-        </h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Vault Dashboard
+          </h1>
+
+          {/* Print button — hidden automatically in @media print via data-print-trigger */}
+          <PrintPortfolioButton />
+        </div>
 
         <p className="text-sm text-zinc-500">
           Real-time overview of your Aura vault positions.
@@ -310,84 +319,48 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
             aria-label="Vault statistics"
           >
             <StatCard
-              testId="total-assets"
+              data-cy="stat-tvl"
               label="TVL"
               value={fmtNumber(stats!.tvl)}
+              rawValue={parseFloat(stats!.tvl)}
+              decimals={4}
               sub="Total Value Locked"
             />
-< HEAD
-
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4" role="region" aria-label="Vault statistics">
-          <StatCard
-            data-cy="stat-tvl"
-            label="TVL"
-            value={fmtNumber(stats!.tvl)}
-            rawValue={parseFloat(stats!.tvl)}
-            decimals={4}
-            sub="Total Value Locked"
-          />
-          <StatCard
-            data-cy="stat-apy"
-            label="APY"
-            value={`${fmtNumber(stats!.apy)}%`}
-            rawValue={parseFloat(stats!.apy)}
-            decimals={2}
-            suffix="%"
-            sub="Annualized yield"
-          />
-          <StatCard
-            data-cy="stat-balance"
-            label="Your Balance"
-            value={fmtNumber(stats!.userBalance)}
-            rawValue={parseFloat(stats!.userBalance)}
-            decimals={4}
-            sub="Underlying tokens"
-          />
-          <div
-            data-cy="stat-shares"
-            className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Your Shares</span>
-            <AnimatedShareBalance
-              value={fmtNumber(stats!.userShares)}
-              className="font-mono text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
-            />
-            <span className="text-xs text-zinc-400">
-              <AnimatedShareBalance
-                value={stats!.pricePerShare}
-                className="font-mono"
-                priceMode
-              />
-              {" / share"}
-            </span>
-          </div>
-        </div>
-      )}
- upstream/main
-
             <StatCard
-              testId="apy"
+              data-cy="stat-apy"
               label="APY"
               value={`${fmtNumber(stats!.apy)}%`}
+              rawValue={parseFloat(stats!.apy)}
+              decimals={2}
+              suffix="%"
               sub="Annualized yield"
             />
-
             <StatCard
-              testId="share-balance"
+              data-cy="stat-balance"
               label="Your Balance"
               value={fmtNumber(stats!.userBalance)}
+              rawValue={parseFloat(stats!.userBalance)}
+              decimals={4}
               sub="Underlying tokens"
             />
-
-            <StatCard
-              testId="price-per-share"
-              label="Your Shares"
-              value={fmtNumber(stats!.userShares)}
-              sub={`@ ${stats!.pricePerShare} / share`}
-            />
+            <div
+              data-cy="stat-shares"
+              className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Your Shares</span>
+              <AnimatedShareBalance
+                value={fmtNumber(stats!.userShares)}
+                className="font-mono text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
+              />
+              <span className="text-xs text-zinc-400">
+                <AnimatedShareBalance
+                  value={stats!.pricePerShare}
+                  className="font-mono"
+                  priceMode
+                />
+                {" / share"}
+              </span>
+            </div>
           </div>
         )}
 
@@ -430,8 +403,6 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
       </div>
 
       {/* Transactions */}
-    <section
-
       <section
         aria-labelledby="tx-heading"
         className="relative z-50"
@@ -470,8 +441,7 @@ fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/apy`),
             ))
           )}
         </div>
-
-</section>
+      </section>
     </main>
   );
 }
