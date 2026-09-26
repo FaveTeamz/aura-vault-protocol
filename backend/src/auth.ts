@@ -21,6 +21,7 @@ export interface TokenPayload {
   sessionId: string;
   deviceId?: string;
   tier?: Tier;
+  role?: string;
 }
 
 export interface TokenPair {

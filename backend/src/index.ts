@@ -26,6 +26,7 @@ import { queueRouter } from "./routes/queueRoutes.js";
 import { warmCache } from "./services/defi.js";
 import { startEmailWorker, stopEmailWorker } from "./services/emailQueue.js";
 import { startYieldWorker, stopYieldWorker } from "./services/yieldWorker.js";
+import { eventsRouter } from "./routes/eventsRoutes.js";
 
 const app = express();
 app.use(cors());
@@ -89,6 +90,7 @@ app.use("/api/v1/gas", gasRouter);
 app.use("/api/vault", vaultRouter);
 app.use("/api/v1/yield", yieldRouter);
 app.use("/api/v1/queue", queueRouter);
+app.use("/api/v1/events", eventsRouter);
 
 app.get("/api/health", async (_req, res) => {
   const redisHealthy = await pingRedis();
