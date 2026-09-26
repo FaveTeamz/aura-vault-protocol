@@ -34,8 +34,11 @@ import { warmCache } from "./services/defi.js";
 import { runCacheWarmup, getWarmupStatus } from "./services/cacheWarmup.js";
 import { startEmailWorker, stopEmailWorker } from "./services/emailQueue.js";
 import { startYieldWorker, stopYieldWorker } from "./services/yieldWorker.js";
+import { startHarvestRepeatableJob, stopHarvestRepeatableJob } from "./services/harvestRepeatableJob.js";
 import { vaultRouter } from "./routes/vaultRoutes.js";
 import { vaultTransactionRouter } from "./routes/vaultTransactionRoutes.js";
+import { vaultRegistryRouter } from "./routes/vaultRegistryRoutes.js";
+import { startVaultSyncJob, stopVaultSyncJob } from "./services/vaultRegistryService.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
@@ -167,6 +170,9 @@ app.use("/api/analytics", analyticsRouter);
 // Issue #302: Vault transaction endpoints (deposit / withdraw / harvest)
 app.use("/api/v1/vault", vaultTransactionRouter);
 
+// Issue #942: Vault registry CRUD — public read, admin-only write
+app.use("/api/v1/vaults", vaultRegistryRouter);
+
 // Issue #868: OpenAPI 3.1 Spec and Swagger UI at /api/docs
 app.use("/api/docs", swaggerRouter);
 
@@ -219,6 +225,8 @@ const server = app.listen(PORT, () => {
   startWorker();
   startEmailWorker();
   startYieldWorker();
+  startVaultSyncJob();        // issue #942: background TVL/APY sync for vault registry
+  void startHarvestRepeatableJob(); // issue #944: BullMQ repeatable harvest cron job
   void warmCache();           // existing DeFi price warm-up
   void runCacheWarmup();      // issue #325: vault stats / share price / top depositors
   logger.info({ port: PORT }, `Aura Vault backend running on port ${PORT}`);
@@ -229,6 +237,8 @@ async function shutdown(signal: string): Promise<void> {
   stopWorker();
   stopEmailWorker();
   stopYieldWorker();
+  stopVaultSyncJob();         // issue #942
+  await stopHarvestRepeatableJob(); // issue #944
   await shutdownTracing();
   server.close(async () => {
     await disconnectRedis().catch((err) => {

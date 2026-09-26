@@ -41,3 +41,35 @@ groups:
             No events have been indexed in the last 10 minutes. This may be
             normal during quiet periods or may indicate that the indexer
             has crashed or lost its connection to the Horizon/RPC source.
+
+  # ── Issue #943: Horizon SSE listener reconnect alerts ─────────────────────
+  - name: horizon-listener
+    rules:
+      # Fires after 5 consecutive reconnect failures within a 5-minute window
+      - alert: HorizonListenerDown
+        expr: increase(horizon_listener_reconnects_total[5m]) >= 5
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Horizon SSE listener has failed to reconnect 5+ times in 5 minutes"
+          description: >
+            The HorizonListener has attempted to reconnect to the Horizon SSE
+            endpoint {{ $value }} times in the last 5 minutes without success.
+            On-chain events are not being indexed. Check Horizon availability
+            and backend logs for the correlation ID.
+            Contract: {{ $labels.contract_id }}.
+
+      # Informational: any reconnect activity (useful for dashboards)
+      - alert: HorizonListenerReconnecting
+        expr: increase(horizon_listener_reconnects_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Horizon SSE listener reconnected"
+          description: >
+            The HorizonListener reconnected {{ $value }} time(s) in the last
+            15 minutes. This may be transient. Watch for HorizonListenerDown
+            if failures continue.
+            Contract: {{ $labels.contract_id }}.

@@ -112,6 +112,14 @@ const envSchema = z.object({
     .optional()
     .default("https://horizon-testnet.stellar.org"),
   VAULT_CONTRACT_ID: optionalStr,
+
+  // ── Harvest scheduler (#944) ────────────────────────────────────────────────
+  /**
+   * How many hours between automatic harvests. Translated to a cron expression
+   * by harvestRepeatableJob.ts. Default: 6 (every 6 hours: "0 *\/6 * * *").
+   */
+  HARVEST_INTERVAL_HOURS: positiveInt(6),
+  HARVEST_KEEPER_SECRET_ID: optionalStr,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,12 +296,16 @@ export type DatabaseConfig = typeof databaseConfig;
 /**
  * Stellar / Horizon settings.
  *
- * @property horizonUrl      - Horizon REST API base URL
- * @property vaultContractId - On-chain Soroban contract address for the Aura Vault
+ * @property horizonUrl          - Horizon REST API base URL
+ * @property vaultContractId     - On-chain Soroban contract address for the Aura Vault
+ * @property harvestIntervalHours - Hours between automated harvests (default: 6)
+ * @property harvestKeeperSecretId - AWS Secrets Manager secret for the keeper keypair
  */
 export const stellarConfig = {
   horizonUrl: env.HORIZON_URL,
   vaultContractId: env.VAULT_CONTRACT_ID,
+  harvestIntervalHours: env.HARVEST_INTERVAL_HOURS,
+  harvestKeeperSecretId: env.HARVEST_KEEPER_SECRET_ID,
 } as const;
 
 export type StellarConfig = typeof stellarConfig;
