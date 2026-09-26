@@ -20,3 +20,5 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
+export * from "./Icons";
+

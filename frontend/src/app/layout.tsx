@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -27,8 +28,16 @@ export const metadata: Metadata = {
       <body className="min-h-full flex flex-col bg-white text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100">
         <ThemeProvider>
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
-            <a href="/" className="text-sm font-semibold tracking-tight">
-              Aura Vault
+            <a href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+              <Image
+                src="/logo.svg"
+                alt="Aura Vault Protocol logo"
+                width={28}
+                height={28}
+                priority
+                className="rounded-lg"
+              />
+              <span>Aura Vault</span>
             </a>
 
             <div className="flex items-center gap-4">

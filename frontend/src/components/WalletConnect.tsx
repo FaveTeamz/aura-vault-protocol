@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ChevronDown } from "lucide-react";
 import { useOnboarding } from "@/components/OnboardingChecklist";
 import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
+import { WalletIcon } from "./Icons";
 
 type WalletType = "freighter" | "metamask" | "xBull";
 
@@ -311,9 +312,10 @@ export default function WalletConnect({
             type="button"
             onClick={() => connectWallet(type)}
             disabled={loading}
-            className="rounded-md border px-4 py-2 text-sm disabled:opacity-50"
+            className="rounded-md border px-4 py-2 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? "Connecting..." : `Connect ${type}`}
+            <WalletIcon type={type} size={18} />
+            <span>{loading ? "Connecting..." : `Connect ${type}`}</span>
           </button>
         ))
       )}

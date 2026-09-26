@@ -92,12 +92,21 @@ function initials(name: string) {
   return name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
+const avatarSizePx: Record<AvatarSize, number> = {
+  xs: 24,
+  sm: 32,
+  md: 40,
+  lg: 48,
+  xl: 64,
+};
+
 /** User avatar: shows image when available, falls back to initials. */
 export function Avatar({ src, alt, name, size = "md" }: AvatarProps) {
+  const px = avatarSizePx[size];
   return (
     <div className={`ds-avatar ds-avatar--${size}`} aria-label={alt ?? name ?? "Avatar"}>
       {src
-        ? <img src={src} alt={alt ?? name ?? ""} className="ds-avatar__img" />
+        ? <img src={src} alt={alt ?? name ?? ""} width={px} height={px} loading="lazy" className="ds-avatar__img" />
         : <span className="ds-avatar__initials" aria-hidden="true">{name ? initials(name) : "?"}</span>
       }
     </div>
