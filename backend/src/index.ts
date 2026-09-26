@@ -38,6 +38,7 @@ import { vaultRouter } from "./routes/vaultRoutes.js";
 import { vaultTransactionRouter } from "./routes/vaultTransactionRoutes.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
+import { portfolioHistoryRouter } from "./routes/portfolioHistoryRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
 import {
   applySecurityHeaders,
@@ -154,6 +155,8 @@ app.use("/api/webhooks", authenticate, webhookRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/notifications/email", notificationRouter);
 app.use("/api/v1/user/portfolio", authenticate, portfolioRouter);
+// Issue #290: Portfolio history — public read; address is in the path param
+app.use("/api/portfolio", portfolioHistoryRouter);
 app.use("/api/v1/gas", gasRouter);
 app.use("/api/v1/yield", yieldRouter);
 app.use("/api/v1/queue", queueRouter);
