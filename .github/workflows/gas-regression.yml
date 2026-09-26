@@ -1,0 +1,150 @@
+name: Gas Regression
+
+on:
+  pull_request:
+    branches: ["**"]
+  push:
+    branches: [main]
+
+concurrency:
+  group: gas-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gas-regression:
+    name: Gas Regression Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: aura-vault
+
+    permissions:
+      pull-requests: write   # allows posting a PR comment with the gas table
+      contents: read
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Rust toolchain ────────────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            aura-vault/target
+          key: ${{ runner.os }}-cargo-gas-${{ hashFiles('aura-vault/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-gas-
+
+      # ── Build Wasm (required by contractimport! macro) ────────────────────
+      - name: Build Wasm
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      # ── Run gas measurement test ──────────────────────────────────────────
+      - name: Measure gas usage
+        run: |
+          cargo test --test gas_regression write_gas_measurements -- --nocapture 2>&1 | tee ../gas-measurement-log.txt
+
+      # ── Verify measurements file was produced ─────────────────────────────
+      - name: Verify gas-measurements.json exists
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ ! -f gas-measurements.json ]; then
+            echo "❌ gas-measurements.json was not produced by the test."
+            exit 1
+          fi
+          echo "✅ gas-measurements.json found:"
+          cat gas-measurements.json
+
+      # ── Node setup for the comparison script ──────────────────────────────
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # ── Compare measured gas against baseline ────────────────────────────
+      - name: Check gas regression
+        id: gas_check
+        working-directory: ${{ github.workspace }}
+        run: |
+          node scripts/check-gas-regression.js \
+            --baseline gas-baselines.json \
+            --measured  gas-measurements.json \
+            --output    gas-report.md
+        # allow-failure: false — script exits 1 on regression; step fails CI
+
+      # ── Read the report for the PR comment ───────────────────────────────
+      - name: Read gas report
+        if: always() && github.event_name == 'pull_request'
+        id: read_report
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Escape newlines for GitHub Actions output
+          REPORT=$(cat gas-report.md)
+          echo "report<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT"     >> "$GITHUB_OUTPUT"
+          echo "EOF"          >> "$GITHUB_OUTPUT"
+
+      # ── Post / update PR comment ─────────────────────────────────────────
+      - name: Post gas report as PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: gas-regression-report
+          message: ${{ steps.read_report.outputs.report }}
+
+      # ── Upload artefacts ──────────────────────────────────────────────────
+      - name: Upload gas artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-regression-artefacts
+          path: |
+            gas-measurements.json
+            gas-report.md
+            gas-measurement-log.txt
+
+  # ── Baseline update guard ────────────────────────────────────────────────
+  # To update gas-baselines.json:
+  #   1. Open a dedicated PR that ONLY changes gas-baselines.json.
+  #   2. The PR must receive explicit approval from a repository maintainer.
+  #   3. Merge after CI passes on the updated baseline.
+  #
+  # This job prevents accidental baseline updates alongside feature changes
+  # by failing if gas-baselines.json is modified on the same branch as other
+  # contract source changes.
+  baseline-update-guard:
+    name: Baseline Update Guard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check baseline-only rule
+        run: |
+          # List files changed in this PR
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          BASELINE_CHANGED=$(echo "$CHANGED" | grep -c "^gas-baselines\.json$" || true)
+          CONTRACT_CHANGED=$(echo "$CHANGED" | grep -c "^aura-vault/src/" || true)
+
+          if [ "$BASELINE_CHANGED" -gt 0 ] && [ "$CONTRACT_CHANGED" -gt 0 ]; then
+            echo ""
+            echo "❌ gas-baselines.json was modified alongside contract source changes."
+            echo "   Baseline updates must be submitted in a dedicated PR."
+            echo "   See the 'Baseline Update Guard' section in .github/workflows/gas-regression.yml"
+            exit 1
+          fi
+
+          echo "✅ Baseline update rule satisfied."

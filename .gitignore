@@ -2,3 +2,8 @@ target/
 Cargo.lock
 .DS_Store
 *.wasm
+
+# Gas regression — generated measurement file (not the baseline)
+gas-measurements.json
+gas-report.md
+gas-measurement-log.txt

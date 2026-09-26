@@ -1,0 +1,12 @@
+{
+  "_comment": "Gas usage baselines for Aura Vault contract functions. Units are Soroban CPU instructions. Update this file via the 'Update gas baselines' workflow — requires explicit PR approval.",
+  "_schema_version": "1",
+  "baselines": {
+    "initialize": 500000,
+    "deposit":    800000,
+    "withdraw":   850000,
+    "harvest":    750000,
+    "pause":      400000,
+    "unpause":    400000
+  }
+}
