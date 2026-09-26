@@ -24,9 +24,19 @@
   "settings": {
     "title": "Paramètres",
     "saved": "Paramètres enregistrés",
+    "reset_defaults": "Réinitialiser les paramètres",
     "appearance": {
       "title": "Apparence",
       "description": "Choisissez votre thème de couleur préféré."
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez votre langue d'affichage. Les changements sont immédiats."
+    },
+    "currency": {
+      "title": "Devise d'affichage",
+      "description": "Choisissez comment les soldes et les rendements sont affichés.",
+      "note": "Les prix proviennent de flux de marché et sont indicatifs uniquement."
     },
     "wallet": {
       "title": "Portefeuille Connecté",
@@ -44,7 +54,11 @@
       "vault_events": "Alertes de performance du vault",
       "email": "Notifications par e-mail",
       "email_address": "Adresse e-mail",
-      "email_placeholder": "vous@exemple.com"
+      "email_placeholder": "vous@exemple.com",
+      "push_title": "Notifications push du navigateur",
+      "push_description": "Recevez une notification lors d'un événement de récolte du vault.",
+      "push_blocked": "Les notifications push sont bloquées. Mettez à jour les permissions du site.",
+      "push_unsupported": "Les notifications push ne sont pas prises en charge par ce navigateur."
     },
     "security": {
       "title": "Sécurité",

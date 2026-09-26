@@ -24,9 +24,19 @@
   "settings": {
     "title": "Settings",
     "saved": "Settings saved",
+    "reset_defaults": "Reset to defaults",
     "appearance": {
       "title": "Appearance",
       "description": "Choose your preferred color theme."
+    },
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred display language. Changes take effect immediately."
+    },
+    "currency": {
+      "title": "Currency Display",
+      "description": "Choose how vault balances and yield are displayed.",
+      "note": "Prices are fetched from market data feeds and are for display purposes only."
     },
     "wallet": {
       "title": "Connected Wallet",
@@ -44,7 +54,11 @@
       "vault_events": "Vault performance alerts",
       "email": "Email notifications",
       "email_address": "Email address",
-      "email_placeholder": "you@example.com"
+      "email_placeholder": "you@example.com",
+      "push_title": "Browser push notifications",
+      "push_description": "Receive a browser notification when a vault harvest event occurs.",
+      "push_blocked": "Push notifications are blocked by your browser. Update site permissions to enable.",
+      "push_unsupported": "Push notifications are not supported in this browser."
     },
     "security": {
       "title": "Security",
