@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.0.2",
+    "@sentry/nextjs": "^8.40.0",
     "@stellar/stellar-sdk": "^16.0.1",
     "chart.js": "^4.4.0",
     "class-variance-authority": "^0.7.1",

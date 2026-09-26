@@ -3,6 +3,7 @@ export { default as WalletConnect } from "./WalletConnect";
 export { default as TransactionModal } from "./TransactionModal";
 export { default as PerformanceCharts } from "./PerformanceCharts";
 export { default as TransactionHistory } from "./TransactionHistory";
+export { default as YieldProjectionChart } from "./YieldProjectionChart";
 export { default as VaultActions } from "./VaultActions";
 export { default as FAQPage } from "./FAQPage";
 export { default as LazyImage } from "./LazyImage";
