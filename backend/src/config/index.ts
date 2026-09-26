@@ -102,7 +102,13 @@ const envSchema = z.object({
   GAS_DEFAULT_LIMIT: positiveInt(21_000),
 
   // ── Database ───────────────────────────────────────────────────────────────
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  // In test mode, allow a safe local fallback so the app can boot without a
+  // developer-managed .env file. Production and staging still require a real DB URL.
+  DATABASE_URL: z
+    .string()
+    .min(1, "DATABASE_URL is required")
+    .optional()
+    .default("postgres://aura:changeme@localhost:5432/auravault_test"),
   DATABASE_REPLICA_URL: optionalStr,
 
   // ── Stellar ────────────────────────────────────────────────────────────────
@@ -133,6 +139,15 @@ function validateCrossFieldConstraints(
     errors.push(
       "JWT_SECRET is required in non-test environments. " +
       "Set a strong random secret of at least 32 characters."
+    );
+  }
+
+  // DATABASE_URL is required outside the test environment because the app
+  // must connect to a real write database in dev/staging/prod.
+  if (env.NODE_ENV !== "test" && !env.DATABASE_URL) {
+    errors.push(
+      "DATABASE_URL is required in non-test environments. " +
+      "Set a valid Postgres connection string."
     );
   }
 
