@@ -34,6 +34,7 @@ import { warmCache } from "./services/defi.js";
 import { runCacheWarmup, getWarmupStatus } from "./services/cacheWarmup.js";
 import { startEmailWorker, stopEmailWorker } from "./services/emailQueue.js";
 import { startYieldWorker, stopYieldWorker } from "./services/yieldWorker.js";
+import { startAlertEvaluationJob, stopAlertEvaluationJob } from "./services/alertEvaluationJob.js";
 import { vaultRouter } from "./routes/vaultRoutes.js";
 import { vaultTransactionRouter } from "./routes/vaultTransactionRoutes.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
@@ -219,6 +220,7 @@ const server = app.listen(PORT, () => {
   startWorker();
   startEmailWorker();
   startYieldWorker();
+  void startAlertEvaluationJob();  // issue #946: alert threshold evaluation every 5 min
   void warmCache();           // existing DeFi price warm-up
   void runCacheWarmup();      // issue #325: vault stats / share price / top depositors
   logger.info({ port: PORT }, `Aura Vault backend running on port ${PORT}`);
@@ -229,6 +231,7 @@ async function shutdown(signal: string): Promise<void> {
   stopWorker();
   stopEmailWorker();
   stopYieldWorker();
+  await stopAlertEvaluationJob();  // issue #946
   await shutdownTracing();
   server.close(async () => {
     await disconnectRedis().catch((err) => {
