@@ -80,6 +80,25 @@ scrape_configs:
           service:
           stream:
 
+      # 3a. Normalise security/audit events to the "security" level so they
+      #     are routed to the 365-day retention tier in Loki.
+      #     Pino logs security events with level="info" and a "security" field;
+      #     we promote them here to keep retention routing in Loki simple.
+      - match:
+          selector: '{service="aura-vault-backend"}'
+          stages:
+            - json:
+                source: output
+                expressions:
+                  security: security
+            - labels:
+                security:
+            - template:
+                source: level
+                template: '{{ if eq .security "true" }}security{{ else }}{{ .level }}{{ end }}'
+            - labels:
+                level:
+
       # 4. Parse the Pino ISO timestamp as the official log timestamp
       - timestamp:
           source: timestamp
