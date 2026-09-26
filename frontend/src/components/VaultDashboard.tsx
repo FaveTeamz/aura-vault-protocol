@@ -8,6 +8,7 @@ import { FinancialValue } from "./FinancialValue";
 import { EmptyState } from "./EmptyState";
 import { AnimatedShareBalance } from "./AnimatedShareBalance";
 import { useAnimatedNumber } from "@/lib/useAnimatedNumber";
+import { VaultCapacityBar } from "./VaultCapacityBar";
 
 interface VaultStats {
   tvl: string;
@@ -277,6 +278,9 @@ export default function VaultDashboard() {
           </div>
         </div>
       )}
+
+      {/* Vault Capacity Bar — Issue #1005: only visible when tvl_cap is set */}
+      <VaultCapacityBar />
 
       {/* Wallet + Actions row */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
