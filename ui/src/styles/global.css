@@ -1,9 +1,16 @@
 /* ── Design tokens ─────────────────────────────────────────────────────── */
+/* Spacing scale is defined in tokens.css and imported below             */
+@import "./tokens.css";
+
 :root {
   /* Background / surface — dark theme */
   --color-bg: #0f1117;
   --color-surface: #1a1d27;
   --color-surface-raised: #22263a;
+
+  /* Skeleton colour tokens — #992 */
+  --color-skeleton-base: var(--color-surface-raised);
+  --color-skeleton-shimmer: #2e3350;
 
   /* Text — contrast ≥ 4.5:1 on --color-surface */
   --color-text: #e8eaf6;       /* 13.5:1 on --color-surface */
@@ -21,14 +28,6 @@
 
   /* Focus ring */
   --focus-ring: 0 0 0 3px #7c83fd80;
-
-  /* Spacing */
-  --sp-1: 0.25rem;
-  --sp-2: 0.5rem;
-  --sp-3: 0.75rem;
-  --sp-4: 1rem;
-  --sp-6: 1.5rem;
-  --sp-8: 2rem;
 
   /* Typography */
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -288,11 +287,11 @@ body {
   transform: none;
 }
 
-/* ── Skeleton — #99 / #133 shimmer animation ───────────────────────────── */
+/* ── Skeleton — #99 / #992 shimmer animation ───────────────────────────── */
 .skeleton-wrapper {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-row {
@@ -300,9 +299,9 @@ body {
   border-radius: var(--radius);
   background: linear-gradient(
     90deg,
-    var(--color-surface-raised) 25%,
-    #2e3350 50%,
-    var(--color-surface-raised) 75%
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -310,7 +309,7 @@ body {
 .skeleton-row--sm { height: 0.875rem; }
 .skeleton-row--lg { height: 1.75rem; }
 .skeleton-row--input { height: 2.5rem; border-radius: var(--radius); }
-.skeleton-row--btn { height: 2.5rem; width: 40%; border-radius: var(--radius); margin-top: var(--sp-2); }
+.skeleton-row--btn { height: 2.5rem; width: 40%; border-radius: var(--radius); margin-top: var(--spacing-sm); }
 
 .skeleton-row:nth-child(2) { width: 75%; }
 .skeleton-row:nth-child(3) { width: 55%; }
@@ -322,9 +321,9 @@ body {
   flex-shrink: 0;
   background: linear-gradient(
     90deg,
-    var(--color-surface-raised) 25%,
-    #2e3350 50%,
-    var(--color-surface-raised) 75%
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -339,14 +338,14 @@ body {
 .skeleton-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--sp-4);
+  gap: var(--spacing-md);
 }
 
 .skeleton-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-surface-raised);
@@ -355,34 +354,34 @@ body {
 .skeleton-card__header {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-card__footer {
   display: flex;
   justify-content: space-between;
-  gap: var(--sp-3);
-  margin-top: var(--sp-2);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
 }
 
 /* Table skeleton */
 .skeleton-table {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-table__head,
 .skeleton-table__row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .skeleton-table__head {
   border-bottom: 1px solid var(--color-surface-raised);
-  padding-bottom: var(--sp-3);
+  padding-bottom: var(--spacing-sm);
 }
 
 .skeleton-table__row:nth-child(even) {
@@ -394,8 +393,8 @@ body {
 .skeleton-graph {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-surface-raised);
@@ -404,7 +403,7 @@ body {
 .skeleton-graph__bars {
   display: flex;
   align-items: flex-end;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
   height: 160px;
 }
 
@@ -413,9 +412,9 @@ body {
   border-radius: var(--radius) var(--radius) 0 0;
   background: linear-gradient(
     90deg,
-    var(--color-surface-raised) 25%,
-    #2e3350 50%,
-    var(--color-surface-raised) 75%
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -431,13 +430,13 @@ body {
 .skeleton-form {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--spacing-md);
 }
 
 .skeleton-form__field {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
 }
 
 /* Loading indicator with progress bar */

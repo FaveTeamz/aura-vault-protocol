@@ -1,0 +1,35 @@
+/* ── Design Tokens — Spacing Scale ────────────────────────────────────────
+ *
+ * 4px base grid. All spacing values are multiples of 4px (0.25rem).
+ *
+ * Usage:
+ *   padding: var(--spacing-md);   → 16px
+ *   margin: var(--spacing-lg);    → 24px
+ *
+ * Tailwind mapping (if Tailwind is configured):
+ *   spacing.xs   → 1   (0.25rem / 4px)
+ *   spacing.sm   → 2   (0.5rem  / 8px)
+ *   spacing.md   → 4   (1rem    / 16px)
+ *   spacing.lg   → 6   (1.5rem  / 24px)
+ *   spacing.xl   → 8   (2rem    / 32px)
+ *   spacing.2xl  → 12  (3rem    / 48px)
+ *   spacing.3xl  → 16  (4rem    / 64px)
+ * ─────────────────────────────────────────────────────────────────────── */
+:root {
+  /* ── Spacing scale (4px base grid) ──────────────────────────────────── */
+  --spacing-xs:  0.25rem;   /* 4px  */
+  --spacing-sm:  0.5rem;    /* 8px  */
+  --spacing-md:  1rem;      /* 16px */
+  --spacing-lg:  1.5rem;    /* 24px */
+  --spacing-xl:  2rem;      /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+  --spacing-3xl: 4rem;      /* 64px */
+
+  /* ── Legacy aliases — kept for backward-compat with existing --sp-N vars */
+  --sp-1: var(--spacing-xs);    /* 4px  */
+  --sp-2: var(--spacing-sm);    /* 8px  */
+  --sp-3: 0.75rem;              /* 12px — intentional mid-step */
+  --sp-4: var(--spacing-md);    /* 16px */
+  --sp-6: var(--spacing-lg);    /* 24px */
+  --sp-8: var(--spacing-xl);    /* 32px */
+}
