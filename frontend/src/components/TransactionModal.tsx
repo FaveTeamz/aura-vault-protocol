@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 
-type TxType = "deposit" | "withdraw";
+type TxType = "deposit" | "withdraw" | "harvest";
 type Step = 1 | 2 | 3;
 type TxStatus = "idle" | "pending" | "success" | "error";
 
@@ -39,17 +39,83 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
   const [gasLoading, setGasLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
+  // Focus management on mount and unmount
   useEffect(() => {
-    if (step === 1) inputRef.current?.focus();
+    // Capture trigger element before modal takes focus
+    triggerRef.current = document.activeElement as HTMLElement | null;
+
+    // Move focus into modal: first input or modal heading
+    const timer = setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      } else if (headingRef.current) {
+        headingRef.current.focus();
+      } else if (modalRef.current) {
+        modalRef.current.focus();
+      }
+    }, 30);
+
+    return () => {
+      clearTimeout(timer);
+      // Return focus to trigger element on close
+      triggerRef.current?.focus();
+    };
+  }, []);
+
+  // Update focus when step changes
+  useEffect(() => {
+    if (step === 1) {
+      inputRef.current?.focus();
+    } else if (headingRef.current) {
+      headingRef.current.focus();
+    }
   }, [step]);
 
+  // Focus trap & Escape key
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key === "Tab") {
+        if (!modalRef.current) return;
+        const focusableSelector =
+          'button:not([disabled]):not([aria-hidden="true"]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+        ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+
+        if (focusables.length === 0) {
+          e.preventDefault();
+          return;
+        }
+
+        const firstEl = focusables[0];
+        const lastEl = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl || !modalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            lastEl.focus();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
+      }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   async function estimateGas(txAmount: string): Promise<void> {
@@ -149,7 +215,12 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
     handleSubmit(true);
   }
 
-  const label = type === "deposit" ? "Deposit" : "Withdraw";
+  const labelMap: Record<TxType, string> = {
+    deposit: "Deposit",
+    withdraw: "Withdraw",
+    harvest: "Harvest",
+  };
+  const label = labelMap[type] ?? "Deposit";
   const balanceNum = parseFloat(balance);
   const amountNum = parseFloat(amount) || 0;
   const totalWithGas = amountNum + (parseFloat(gasEstimate?.totalGas || "0"));
@@ -159,10 +230,14 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-modal-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label={`${label} modal`}
+      aria-labelledby="modal-title"
       data-cy="tx-modal"
     >
-      <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900 animate-modal-content">
+      <div
+        ref={modalRef}
+        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900 animate-modal-content"
+        tabIndex={-1}
+      >
         <button
           data-cy="modal-close"
           onClick={onClose}
@@ -172,7 +247,14 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
           ✕
         </button>
 
-        <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">{label}</h2>
+        <h2
+          id="modal-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50 outline-none"
+        >
+          {label}
+        </h2>
 
         {/* Step indicator */}
         <div className="flex gap-2 mb-6">

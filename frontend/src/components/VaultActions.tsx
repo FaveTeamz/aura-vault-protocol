@@ -15,7 +15,7 @@ import TransactionModal from "./TransactionModal";
 import DepositButton, { type ButtonTxState } from "./DepositButton";
 import { useOnboarding } from "@/components/OnboardingChecklist";
 
-type Tab = "deposit" | "withdraw";
+type Tab = "deposit" | "withdraw" | "harvest";
 
 export default function VaultActions() {
   const [tab, setTab] = useState<Tab>("deposit");
@@ -27,14 +27,15 @@ export default function VaultActions() {
   const { markComplete } = useOnboarding();
 
   useEffect(() => {
-   useEffect(() => {
-  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/balance_of?address=mock`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => {
-      if (d?.balance) setBalance(d.balance);
-    })
-    .catch(() => {});
-}, []);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+    fetch(`${apiUrl}/api/vault/balance_of?address=mock`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.balance) setBalance(d.balance);
+      })
+      .catch(() => {});
+  }, []);
+
   /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
@@ -84,6 +85,17 @@ export default function VaultActions() {
         >
           Withdraw
         </button>
+        <button
+          data-cy="harvest-tab"
+          onClick={() => setTab("harvest")}
+          className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+            tab === "harvest"
+              ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
+              : "border border-zinc-300 hover:bg-zinc-50 dark:border-zinc-600 dark:hover:bg-zinc-800"
+          }`}
+        >
+          Harvest
+        </button>
       </div>
 
       <p className="text-sm text-zinc-500 mb-4">
@@ -119,13 +131,22 @@ export default function VaultActions() {
         </button>
       )}
 
+      {/* Harvest tab */}
+      {tab === "harvest" && (
+        <button
+          data-cy="open-harvest-modal"
+          onClick={() => setModal("harvest")}
+          className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-semibold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+        >
+          Harvest
+        </button>
+      )}
+
       {/* Modal */}
       {modal && (
         <TransactionModal
           type={modal}
           balance={balance}
-          sharePrice={sharePrice}
-          sharePriceUpdatedAt={sharePriceUpdatedAt}
           onClose={() => handleModalClose(modal)}
         />
       )}
