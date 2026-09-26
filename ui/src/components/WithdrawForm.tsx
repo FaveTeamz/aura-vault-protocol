@@ -28,7 +28,7 @@ export function WithdrawForm({ onToast }: Props) {
     setLoading(true);
     announce("Processing withdrawal, please wait.");
     try {
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 100));
       setShares("");
       announce(`Withdrew ${shares} shares successfully.`);
       onToast({ type: "success", text: `Withdrew ${shares} shares successfully.` });
@@ -65,20 +65,21 @@ export function WithdrawForm({ onToast }: Props) {
           <div className="field">
             <label htmlFor={`${id}-shares`}>Shares</label>
             <input
-              ref={inputRef}
-              id={`${id}-shares`}
-              type="number"
-              min="0"
-              step="any"
-              value={shares}
-              onChange={(e) => { setShares(e.target.value); if (fieldError) setFieldError(""); }}
-              aria-describedby={fieldError ? `${id}-err` : `${id}-hint`}
-              aria-invalid={!!fieldError}
-              aria-required="true"
-              placeholder="0.00"
-              className="input"
-              autoComplete="off"
-            />
+  ref={inputRef}
+  id={`${id}-shares`}
+  type="number"
+  min="0"
+  step="any"
+  value={shares}
+  onChange={(e) => { setShares(e.target.value); if (fieldError) setFieldError(""); }}
+  aria-label="Shares"
+  aria-describedby={fieldError ? `${id}-err` : `${id}-hint`}
+  aria-invalid={!!fieldError}
+  aria-required="true"
+  placeholder="0.00"
+  className="input"
+  autoComplete="off"
+/>
             <p id={`${id}-hint`} className="field-hint" aria-hidden={!!fieldError}>
               Enter the number of vault shares to redeem for underlying tokens.
             </p>

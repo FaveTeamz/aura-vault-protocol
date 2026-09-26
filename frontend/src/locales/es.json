@@ -72,5 +72,31 @@
     "light": "Claro",
     "dark": "Oscuro",
     "auto": "Auto"
+  },
+  "vault_errors": {
+    "1":  { "title": "Vault No Inicializado",        "message": "El vault aún no ha sido inicializado. Contacta al administrador o verifica la dirección del contrato." },
+    "2":  { "title": "Ya Inicializado",              "message": "El vault ya ha sido inicializado y no puede configurarse nuevamente." },
+    "3":  { "title": "Participaciones Insuficientes","message": "No tienes suficientes participaciones del vault para completar este retiro. Verifica tu saldo." },
+    "4":  { "title": "Subyacente Insuficiente",      "message": "El vault no tiene suficientes tokens subyacentes para cubrir este canje. Contacta al administrador." },
+    "5":  { "title": "Monto Cero",                   "message": "El monto debe ser mayor que cero. Aumenta el monto e inténtalo de nuevo." },
+    "6":  { "title": "Desbordamiento Aritmético",    "message": "Desbordamiento aritmético: el monto de la transacción es demasiado grande. Intenta con un monto menor." },
+    "7":  { "title": "Dirección Inválida",           "message": "La dirección o el token no es reconocido. Asegúrate de que haya sido incluido en la lista blanca por el administrador." },
+    "8":  { "title": "Sin Accionistas",              "message": "El vault aún no tiene accionistas. El rendimiento no puede distribuirse hasta que alguien deposite." },
+    "9":  { "title": "No Autorizado",                "message": "Solo el administrador del vault puede realizar esta acción. Conéctate con la cuenta de administrador e inténtalo de nuevo." },
+    "10": { "title": "Versión de Almacenamiento Incorrecta", "message": "Actualización del contrato fallida: versión del esquema de almacenamiento incompatible. Se requiere una migración primero." },
+    "11": { "title": "Vault en Pausa",               "message": "El vault está actualmente en pausa. Por favor espera a que el administrador reanude las operaciones." },
+    "12": { "title": "Saldo Inconsistente",          "message": "Alerta de seguridad: el saldo de tokens del vault no coincide con sus registros. Contacta al administrador de inmediato." },
+    "13": { "title": "Bloqueo Temporal No Expirado", "message": "Esta propuesta de gobernanza aún no puede ejecutarse. El período de bloqueo temporal no ha expirado." },
+    "14": { "title": "Propuesta No Aprobada",        "message": "Esta propuesta de gobernanza no ha recibido suficientes aprobaciones para ejecutarse." },
+    "15": { "title": "Ya Votó",                      "message": "Ya votaste en esta propuesta. Cada firmante solo puede votar una vez." },
+    "16": { "title": "Límite TVL Excedido",          "message": "Este depósito excedería el límite de valor total bloqueado del vault. Intenta con un monto menor o espera a que haya capacidad." },
+    "17": { "title": "Rendimiento Demasiado Pequeño","message": "El monto de rendimiento es demasiado pequeño para distribuir — se redondea a cero por participación. Acumula más rendimiento primero." },
+    "18": { "title": "Error de Precisión en Distribución", "message": "La verificación de precisión de distribución de rendimiento falló. Ajusta ligeramente el monto e inténtalo de nuevo." },
+    "19": { "title": "Cooldown de Cosecha",          "message": "Una cosecha fue realizada muy recientemente. Espera a que expire el período de cooldown antes de cosechar nuevamente." },
+    "20": { "title": "Retiro en Cola",               "message": "Tu retiro ha sido puesto en cola. Reclamarlo después de que expire el período de desvinculación usando el ID de tu entrada en cola." },
+    "21": { "title": "Entrada en Cola No Encontrada","message": "Entrada en la cola de retiros no encontrada. Puede que no exista o ya haya sido reclamada." },
+    "22": { "title": "Desvinculación Pendiente",     "message": "Tu retiro aún está en el período de desvinculación. Por favor espera e inténtalo después del tiempo de desbloqueo." },
+    "23": { "title": "Tarifa de Retiro Inválida",    "message": "La tarifa de retiro excede la tasa máxima permitida del 5%. Usa un valor entre 0 y 500 puntos básicos." },
+    "24": { "title": "Interruptor de Circuito Activado", "message": "Cosecha rechazada: el movimiento del precio de participación excedió el límite de seguridad. El vault ha sido pausado automáticamente pendiente de revisión del administrador." }
   }
 }

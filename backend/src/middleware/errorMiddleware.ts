@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "../logger.js";
 
 export interface ApiError extends Error {
   statusCode?: number;
@@ -35,7 +36,7 @@ export function createApiError(
 
 export function errorHandler(
   err: Error | ApiError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ) {
@@ -46,11 +47,18 @@ export function errorHandler(
     errorMessages[err.message] ||
     "An unexpected error occurred. Please try again.";
 
-  console.error(`[${new Date().toISOString()}] Error:`, {
-    message: err.message,
-    statusCode,
-    stack: err.stack,
-  });
+  logger.error(
+    {
+      err: {
+        message: err.message,
+        statusCode,
+        stack: err.stack,
+      },
+      correlationId:
+        (req as Request & { correlationId?: string }).correlationId ?? "unknown",
+    },
+    "Request error"
+  );
 
   const response = {
     success: false,
@@ -58,6 +66,11 @@ export function errorHandler(
       code: err.message,
       message: userMessage,
       ...(process.env.NODE_ENV === "development" && { details: err.message }),
+    },
+    meta: {
+      requestId: (req as Request & { requestId?: string }).requestId ?? "unknown",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0",
     },
   };
 

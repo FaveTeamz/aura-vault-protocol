@@ -46,7 +46,7 @@ const RATE_WINDOW = 60_000;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function sign(secret: string, body: string): string {
+export function sign(secret: string, body: string): string {
   return "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
 }
 
@@ -224,4 +224,48 @@ webhookRouter.post("/verify", (req: Request, res: Response) => {
   const expected = sign(secret, body);
   const valid = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
   res.json({ valid });
+});
+
+// POST /api/webhooks/test — send a test webhook delivery to a consumer-provided URL
+webhookRouter.post("/test", async (req: Request, res: Response) => {
+  const { url, secret, payload } = req.body as { url?: string; secret?: string; payload?: Record<string, unknown> };
+
+  if (!url) { res.status(400).json({ error: "url is required" }); return; }
+  if (!secret) { res.status(400).json({ error: "secret is required" }); return; }
+
+  try { new URL(url); } catch {
+    res.status(400).json({ error: "invalid url" });
+    return;
+  }
+
+  const testPayload = payload ?? { test: true, timestamp: new Date().toISOString() };
+  const body = JSON.stringify(testPayload);
+  const signature = sign(secret, body);
+
+  try {
+    const statusCode = await new Promise<number>((resolve, reject) => {
+      const parsed = new URL(url);
+      const client = parsed.protocol === "https:" ? https : http;
+      const reqOut = client.request(parsed, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Aura-Signature": signature,
+          "X-Aura-Event": "test",
+          "X-Aura-Delivery": uuidv4(),
+        },
+      }, (httpRes) => {
+        httpRes.resume();
+        resolve(httpRes.statusCode ?? 0);
+      });
+      reqOut.on("error", reject);
+      reqOut.write(body);
+      reqOut.end();
+    });
+
+    res.json({ delivered: true, statusCode });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.json({ delivered: false, error: message });
+  }
 });

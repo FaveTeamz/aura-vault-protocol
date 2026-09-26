@@ -72,5 +72,31 @@
     "light": "Light",
     "dark": "Dark",
     "auto": "Auto"
+  },
+  "vault_errors": {
+    "1":  { "title": "Vault Not Initialized",     "message": "The vault has not been initialized yet. Contact the admin or verify the contract address." },
+    "2":  { "title": "Already Initialized",       "message": "The vault has already been initialized and cannot be set up again." },
+    "3":  { "title": "Insufficient Shares",       "message": "You do not have enough vault shares to complete this withdrawal. Check your share balance." },
+    "4":  { "title": "Insufficient Underlying",   "message": "The vault does not have enough underlying tokens to cover this redemption. Contact the admin." },
+    "5":  { "title": "Zero Amount",               "message": "Amount must be greater than zero. Increase the input amount and try again." },
+    "6":  { "title": "Arithmetic Overflow",       "message": "Arithmetic overflow: the transaction amount is too large. Try a smaller amount." },
+    "7":  { "title": "Invalid Address",           "message": "The address or token is not recognized. Ensure it has been whitelisted by the admin." },
+    "8":  { "title": "No Shareholders",           "message": "The vault has no shareholders yet. Yield cannot be distributed until someone deposits." },
+    "9":  { "title": "Unauthorized",              "message": "Only the vault admin can perform this action. Connect with the admin account and try again." },
+    "10": { "title": "Storage Layout Mismatch",   "message": "Contract upgrade failed: storage layout version mismatch. A migration is required first." },
+    "11": { "title": "Vault Paused",              "message": "The vault is currently paused. Please wait for the admin to resume operations." },
+    "12": { "title": "Balance Mismatch",          "message": "Security alert: the vault's token balance does not match its records. Contact the admin immediately." },
+    "13": { "title": "Timelock Not Expired",      "message": "This governance proposal cannot be executed yet. The timelock period has not elapsed." },
+    "14": { "title": "Proposal Not Approved",     "message": "This governance proposal has not received enough approvals to execute." },
+    "15": { "title": "Already Voted",             "message": "You have already voted on this proposal. Each signer may only vote once." },
+    "16": { "title": "TVL Cap Exceeded",          "message": "This deposit would exceed the vault's total-value-locked cap. Try a smaller amount or wait for capacity." },
+    "17": { "title": "Yield Too Small",           "message": "The yield amount is too small to distribute — it rounds to zero per share. Accumulate more yield first." },
+    "18": { "title": "Distribution Accuracy Error","message": "Yield distribution precision check failed. Adjust the yield amount slightly and retry." },
+    "19": { "title": "Harvest Cooldown",          "message": "A harvest was performed too recently. Wait for the cooldown period to expire before harvesting again." },
+    "20": { "title": "Withdrawal Queued",         "message": "Your withdrawal has been queued. Claim it after the unbonding period expires using your queue entry ID." },
+    "21": { "title": "Queue Entry Not Found",     "message": "Withdrawal queue entry not found. It may not exist or may have already been claimed." },
+    "22": { "title": "Unbonding Pending",         "message": "Your withdrawal is still in the unbonding period. Please wait and retry after the unlock time." },
+    "23": { "title": "Invalid Withdrawal Fee",    "message": "Withdrawal fee exceeds the maximum allowed rate of 5%. Use a value between 0 and 500 basis points." },
+    "24": { "title": "Circuit Breaker Tripped",   "message": "Harvest rejected: the share price movement exceeded the safety limit. The vault has been auto-paused pending admin review." }
   }
 }

@@ -30,7 +30,7 @@ jobs:
         working-directory: aura-vault
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload security test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-test-results
           path: security-test-results.txt
@@ -79,7 +79,7 @@ jobs:
         working-directory: aura-vault
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cargo-audit-report
           path: audit-report.json
@@ -124,7 +124,7 @@ jobs:
         working-directory: aura-vault
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust stable + clippy
         uses: dtolnay/rust-toolchain@stable
@@ -158,7 +158,7 @@ jobs:
 
       - name: Upload Clippy report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clippy-security-report
           path: clippy-report.txt
