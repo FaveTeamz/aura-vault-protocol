@@ -51,6 +51,8 @@ tags:
     description: Transactional email delivery and tracking
   - name: Vault
     description: Vault metadata, decimals configuration, stats, and operations
+  - name: Events
+    description: Real-time event streaming and Server-Sent Events (SSE)
 
 paths:
   # ---------------------------------------------------------------------------
@@ -1234,6 +1236,93 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ---------------------------------------------------------------------------
+  # Events (Real-Time SSE Stream)
+  # ---------------------------------------------------------------------------
+  /api/events/stream:
+    get:
+      tags: [Events]
+      summary: Real-time Server-Sent Events (SSE) vault event stream
+      description: |
+        Establishes a persistent Server-Sent Events (SSE) connection streaming real-time
+        contract events (deposits, withdrawals, harvests, pause state transitions) and heartbeats.
+        Supports filtering by event type and contract ID, along with stream resumption via `Last-Event-ID`.
+      operationId: streamEvents
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: types
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated list of event types to filter (e.g. `deposit,withdraw,harvest,paused,unpaused`).
+          example: "deposit,withdraw,harvest"
+        - name: contract_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Stellar Soroban contract address to filter events for.
+          example: "CB6XYZABC1234567890SAMPLECONTRACTID"
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional Bearer JWT token when client does not support custom headers (e.g. native browser EventSource).
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema:
+            type: string
+          description: ID of the last successfully processed event. Used for replay and gapless reconnection.
+      responses:
+        "200":
+          description: Persistent SSE stream delivering real-time vault events
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "text/event-stream; charset=utf-8"
+            Cache-Control:
+              schema:
+                type: string
+                example: "no-cache, no-transform"
+            Connection:
+              schema:
+                type: string
+                example: "keep-alive"
+            X-Accel-Buffering:
+              schema:
+                type: string
+                example: "no"
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseStreamMessage"
+              examples:
+                depositEvent:
+                  summary: Deposit event message
+                  value: |
+                    id: 1042-deposit-3
+                    event: deposit
+                    retry: 3000
+                    data: {"type":"deposit","ledger":4829102,"timestamp":"2026-09-26T12:00:00Z","caller":"GABC...XYZ","amount":"1000000000","newShares":"952380952","newTotalShares":"5000000000","newTotalDeposited":"5250000000","txHash":"a1b2c3d4e5f6..."}
+                heartbeatEvent:
+                  summary: Keep-alive heartbeat message
+                  value: |
+                    id: hb-1727355000000
+                    event: heartbeat
+                    data: {"timestamp":1727355000000,"activeConnections":42}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          description: Streaming service temporarily degraded or unavailable
+
 # ---------------------------------------------------------------------------
 # Components
 # ---------------------------------------------------------------------------
@@ -2044,3 +2133,88 @@ components:
         dns:
           type: object
           additionalProperties: true
+
+    SseStreamMessage:
+      type: object
+      description: Structure of a Server-Sent Events stream message frame
+      properties:
+        id:
+          type: string
+          description: Unique event sequence identifier for tracking and replay.
+          example: "1042-deposit-3"
+        event:
+          type: string
+          enum: [connected, deposit, withdraw, harvest, paused, unpaused, heartbeat]
+          description: Event category name.
+          example: "deposit"
+        retry:
+          type: integer
+          description: Client reconnection delay in milliseconds.
+          example: 3000
+        data:
+          oneOf:
+            - $ref: "#/components/schemas/SseDepositPayload"
+            - $ref: "#/components/schemas/SseWithdrawPayload"
+            - $ref: "#/components/schemas/SseHarvestPayload"
+            - $ref: "#/components/schemas/SsePausePayload"
+            - $ref: "#/components/schemas/SseHeartbeatPayload"
+
+    SseDepositPayload:
+      type: object
+      required: [type, ledger, timestamp, caller, amount, newShares, newTotalShares, newTotalDeposited, txHash]
+      properties:
+        type: { type: string, example: "deposit" }
+        ledger: { type: integer, example: 4829102 }
+        timestamp: { type: string, format: date-time, example: "2026-09-26T12:00:00Z" }
+        caller: { type: string, example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST" }
+        amount: { type: string, example: "1000000000" }
+        newShares: { type: string, example: "952380952" }
+        newTotalShares: { type: string, example: "5000000000" }
+        newTotalDeposited: { type: string, example: "5250000000" }
+        txHash: { type: string, example: "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890" }
+
+    SseWithdrawPayload:
+      type: object
+      required: [type, ledger, timestamp, caller, amount, sharesBurned, remainingShares, txHash]
+      properties:
+        type: { type: string, example: "withdraw" }
+        ledger: { type: integer, example: 4829145 }
+        timestamp: { type: string, format: date-time, example: "2026-09-26T12:05:00Z" }
+        caller: { type: string, example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST" }
+        amount: { type: string, example: "500000000" }
+        sharesBurned: { type: string, example: "476190476" }
+        remainingShares: { type: string, example: "476190476" }
+        txHash: { type: string, example: "b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890a1" }
+
+    SseHarvestPayload:
+      type: object
+      required: [type, ledger, timestamp, caller, harvestedAmount, feeAmount, newTotalDeposited, sharePrice, apy]
+      properties:
+        type: { type: string, example: "harvest" }
+        ledger: { type: integer, example: 4829200 }
+        timestamp: { type: string, format: date-time, example: "2026-09-26T12:15:00Z" }
+        caller: { type: string, example: "GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST" }
+        harvestedAmount: { type: string, example: "25000000" }
+        feeAmount: { type: string, example: "500000" }
+        newTotalDeposited: { type: string, example: "5274500000" }
+        sharePrice: { type: string, example: "1.0549" }
+        apy: { type: number, example: 12.85 }
+
+    SsePausePayload:
+      type: object
+      required: [type, ledger, timestamp, admin, paused, reason]
+      properties:
+        type: { type: string, example: "paused" }
+        ledger: { type: integer, example: 4829300 }
+        timestamp: { type: string, format: date-time, example: "2026-09-26T12:30:00Z" }
+        admin: { type: string, example: "GADMINABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLM" }
+        paused: { type: boolean, example: true }
+        reason: { type: string, example: "Emergency circuit-breaker tripped: price deviation" }
+        countdownSeconds: { type: integer, nullable: true, example: 3600 }
+
+    SseHeartbeatPayload:
+      type: object
+      required: [timestamp, activeConnections]
+      properties:
+        timestamp: { type: integer, example: 1727355000000 }
+        activeConnections: { type: integer, example: 42 }

@@ -24,6 +24,7 @@ This document covers every REST endpoint exposed by the Aura Vault backend servi
    - [GET /v1/governance/proposals](#get-v1governanceproposals)
    - [GET /v1/governance/proposals/{id}](#get-v1governanceproposalsid)
    - [GET /v1/health](#get-v1health)
+   - [GET /api/events/stream (SSE)](#get-apieventsstream-sse)
 7. [OpenAPI 3.1 Specification](#7-openapi-31-specification)
 8. [Interactive Swagger UI](#8-interactive-swagger-ui)
 
@@ -983,6 +984,462 @@ Liveness/readiness check for monitoring and load balancers.
 
 ```bash
 curl https://api-testnet.auravault.finance/v1/health
+```
+
+---
+
+### GET /api/events/stream (SSE)
+
+Establishes a persistent Server-Sent Events (SSE) connection that streams real-time vault activity directly to clients. This endpoint powers live dashboard updates, wallet event notifications, and algorithmic keeper monitors without requiring aggressive HTTP polling.
+
+#### Protocol Overview: Server-Sent Events (SSE) vs WebSocket
+
+Aura Vault Protocol utilizes Server-Sent Events (SSE) over standard HTTP/2 and HTTP/1.1 for real-time telemetry:
+
+| Feature | Server-Sent Events (SSE) | WebSocket |
+|---|---|---|
+| **Data Direction** | Server-to-Client (unidirectional streaming) | Full-duplex (bidirectional) |
+| **Transport** | Standard HTTP/HTTPS | TCP upgrade handshake |
+| **HTTP/2 Multiplexing**| Native multiplexing across a single TCP connection | Requires dedicated TCP connection |
+| **Reconnection** | Native browser auto-reconnect with `Last-Event-ID` | Requires custom client state management |
+| **Proxy / ALB Support**| Compatible with standard load balancers & CDNs | Requires sticky sessions & upgrade rules |
+| **Overhead** | Minimal headers, plain UTF-8 text framing | Frame masking and ping/pong framing |
+
+Because vault events originate on the Stellar blockchain (via Horizon RPC and indexing workers) and flow outward to frontend dashboards and automated keeper bots, SSE provides the optimal low-latency, lightweight, and firewall-friendly transport.
+
+#### Authentication Header Format
+
+SSE endpoints require an authenticated user or agent session. Two authentication methods are supported:
+
+##### 1. HTTP Authorization Header (Recommended for programmatic clients & Node.js)
+Include the Bearer access token in the HTTP request headers:
+
+```http
+GET /api/events/stream HTTP/1.1
+Host: api.auravault.finance
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Accept: text/event-stream
+```
+
+##### 2. URL Query Parameter (Browser `EventSource` Fallback)
+Because the W3C standard browser `EventSource` API does not support custom request headers, clients in browser environments may pass the JWT token as a `token` URL query parameter:
+
+```http
+GET /api/events/stream?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... HTTP/1.1
+Host: api.auravault.finance
+Accept: text/event-stream
+```
+
+> [!NOTE]
+> Query parameter tokens are automatically verified by the authentication middleware and scrubbed from access logs to prevent token leakage.
+
+#### Request Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `token` | `string` | No* | Bearer JWT access token (required if `Authorization` header is omitted). |
+| `types` | `string` | No | Comma-separated list of event types to filter (e.g. `deposit,withdraw,harvest`). Default: all events. |
+| `contract_id` | `string` | No | Stellar contract address (`C...`) to filter events for multi-vault deployments. |
+| `from_ledger` | `integer` | No | Starting ledger sequence for historic event backfill on stream start. |
+
+#### Request & Response Headers
+
+##### Request Headers
+- `Accept: text/event-stream` (required)
+- `Authorization: Bearer <token>` (optional if `?token=` parameter is passed)
+- `Last-Event-ID: <id>` (optional; used by clients to resume from the last received event ID)
+
+##### Response Headers
+- `Content-Type: text/event-stream; charset=utf-8`
+- `Cache-Control: no-cache, no-transform`
+- `Connection: keep-alive`
+- `X-Accel-Buffering: no` (disables Nginx / CloudFront proxy buffering)
+
+---
+
+#### Event Types and Payload Schemas
+
+All messages follow standard SSE wire formatting:
+```text
+id: <sequence-id>
+event: <event-type>
+retry: 3000
+data: <json-payload>
+
+```
+
+##### 1. `connected` (Connection Handshake)
+Emitted immediately upon successful connection establishment.
+
+```json
+{
+  "clientId": "client_9f82ab7c-1234",
+  "connectedAt": "2026-09-26T12:00:00.000Z",
+  "subscribedTypes": ["deposit", "withdraw", "harvest", "paused", "unpaused"],
+  "contractId": "CB6XYZABC1234567890SAMPLECONTRACTID",
+  "heartbeatIntervalMs": 15000
+}
+```
+
+##### 2. `deposit`
+Emitted when a user deposits underlying tokens and receives newly minted vault shares.
+
+```json
+{
+  "type": "deposit",
+  "ledger": 4829102,
+  "ledgerTimestamp": 1727352000,
+  "timestamp": "2026-09-26T12:00:00Z",
+  "caller": "GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST",
+  "amount": "1000000000",
+  "newShares": "952380952",
+  "newTotalShares": "5000000000",
+  "newTotalDeposited": "5250000000",
+  "txHash": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890"
+}
+```
+
+##### 3. `withdraw`
+Emitted when a user redeems vault shares for underlying tokens.
+
+```json
+{
+  "type": "withdraw",
+  "ledger": 4829145,
+  "ledgerTimestamp": 1727352300,
+  "timestamp": "2026-09-26T12:05:00Z",
+  "caller": "GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST",
+  "amount": "500000000",
+  "sharesBurned": "476190476",
+  "remainingShares": "476190476",
+  "txHash": "b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890a1"
+}
+```
+
+##### 4. `harvest`
+Emitted when an automated keeper harvests external yield and compounds it into the vault.
+
+```json
+{
+  "type": "harvest",
+  "ledger": 4829200,
+  "ledgerTimestamp": 1727352900,
+  "timestamp": "2026-09-26T12:15:00Z",
+  "caller": "GKEEPERBCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQR",
+  "harvestedAmount": "25000000",
+  "feeAmount": "500000",
+  "newTotalDeposited": "5274500000",
+  "currentSharePrice": "1.0549",
+  "apy": 12.85,
+  "txHash": "c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890a1b2"
+}
+```
+
+##### 5. `paused` / `unpaused`
+Emitted when circuit breaker emergency controls change contract pause state.
+
+```json
+{
+  "type": "paused",
+  "ledger": 4829300,
+  "ledgerTimestamp": 1727353800,
+  "timestamp": "2026-09-26T12:30:00Z",
+  "admin": "GADMINABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLM",
+  "paused": true,
+  "reason": "Emergency circuit-breaker tripped: price deviation > 5%",
+  "countdownSeconds": 3600,
+  "txHash": "d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890a1b2c3"
+}
+```
+
+##### 6. `heartbeat`
+Emitted every 15 seconds to prevent intermediate proxy, NAT gateway, and load balancer idle connection drops.
+
+```json
+{
+  "timestamp": 1727355000000,
+  "activeConnections": 42
+}
+```
+
+---
+
+#### Reconnection Handling & Stream Resumption
+
+Network interruptions and mobile network switches can temporarily terminate SSE streams. The Aura Vault SSE interface implements gap-free stream resumption using the `Last-Event-ID` standard:
+
+1. **Server `retry` Directive**: Every event frame includes `retry: 3000`, instructing conforming client implementations to wait 3,000 milliseconds before initiating an automatic reconnect.
+2. **Reconnection Header (`Last-Event-ID`)**: When reconnecting, standard clients transmit the ID of the last processed event in the `Last-Event-ID` header.
+3. **Replay Buffer**: The backend maintains a circular in-memory buffer of recent events. When `Last-Event-ID` is present, the server replays any missed events that occurred during the disconnected window before resuming live streaming.
+4. **Exponential Backoff**: For custom programmatic clients, we recommend exponential backoff with jitter (e.g. 1s, 2s, 4s, 8s, up to 30s) if consecutive reconnection attempts fail.
+
+---
+
+#### Rate Limits & Connection Boundaries
+
+To ensure fair resource sharing and protect backend infrastructure from connection starvation:
+
+| Limit | Threshold | Action on Violation |
+|---|---|---|
+| **Concurrent Connections per User** | Max 5 active streams | Returns `429 Too Many Requests` |
+| **Concurrent Connections per IP** | Max 20 active streams | Returns `429 Too Many Requests` |
+| **Max Connection Lifetime** | 60 minutes | Server cleanly closes stream with `retry: 1000`; client seamlessly reconnects via `Last-Event-ID` |
+| **Request Rate (Connection Invocations)** | 10 connects / minute | Returns `429 Too Many Requests` |
+
+When a rate limit is exceeded, the server returns a standard error envelope:
+```json
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Maximum concurrent SSE connections exceeded (5 max per user)",
+    "retryAfter": 15
+  }
+}
+```
+
+---
+
+#### Example Code
+
+##### 1. Browser JavaScript (Native `EventSource` with Query Token)
+
+```javascript
+// Browser client using standard native EventSource
+const token = localStorage.getItem("aura_access_token");
+const eventTypes = "deposit,withdraw,harvest,paused";
+const streamUrl = `https://api-testnet.auravault.finance/api/events/stream?token=${encodeURIComponent(token)}&types=${eventTypes}`;
+
+const eventSource = new EventSource(streamUrl);
+
+// Connection established
+eventSource.addEventListener("connected", (e) => {
+  const data = JSON.parse(e.data);
+  console.log("Connected to Aura Vault SSE stream. Client ID:", data.clientId);
+});
+
+// Listen for live deposits
+eventSource.addEventListener("deposit", (e) => {
+  const deposit = JSON.parse(e.data);
+  console.log(`[Deposit] Caller: ${deposit.caller}, Amount: ${deposit.amount}, Shares: ${deposit.newShares}`);
+  // Update UI balance state here
+});
+
+// Listen for live keeper harvests
+eventSource.addEventListener("harvest", (e) => {
+  const harvest = JSON.parse(e.data);
+  console.log(`[Harvest] Yield compounded: ${harvest.harvestedAmount}, New APY: ${harvest.apy}%`);
+});
+
+// Listen for circuit-breaker pause events
+eventSource.addEventListener("paused", (e) => {
+  const alert = JSON.parse(e.data);
+  console.warn(`[CIRCUIT BREAKER] Vault paused! Reason: ${alert.reason}`);
+});
+
+// Error & reconnection handling
+eventSource.onerror = (err) => {
+  if (eventSource.readyState === EventSource.CONNECTING) {
+    console.log("Connection lost, auto-reconnecting with Last-Event-ID...");
+  } else {
+    console.error("SSE stream error occurred:", err);
+  }
+};
+
+// Graceful cleanup on unmount
+function cleanup() {
+  eventSource.close();
+}
+```
+
+##### 2. Modern JavaScript / TypeScript (`@microsoft/fetch-event-source` with Custom Headers)
+
+```typescript
+import { fetchEventSource } from "@microsoft/fetch-event-source";
+
+class RetriableError extends Error {}
+class FatalError extends Error {}
+
+async function subscribeToVaultEvents(accessToken: string, onEvent: (type: string, data: any) => void) {
+  const ctrl = new AbortController();
+
+  await fetchEventSource("https://api-testnet.auravault.finance/api/events/stream?types=deposit,withdraw,harvest", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "text/event-stream",
+    },
+    signal: ctrl.signal,
+    async onopen(response) {
+      if (response.ok && response.headers.get("content-type")?.includes("text/event-stream")) {
+        console.log("SSE connection successfully opened");
+        return;
+      }
+      if (response.status === 429) {
+        throw new RetriableError("Rate limit exceeded, retrying with backoff...");
+      }
+      if (response.status === 401) {
+        throw new FatalError("Authentication expired. Please refresh credentials.");
+      }
+    },
+    onmessage(msg) {
+      if (!msg.data) return;
+      try {
+        const payload = JSON.parse(msg.data);
+        onEvent(msg.event || "message", payload);
+      } catch (err) {
+        console.error("Failed to parse event JSON:", err);
+      }
+    },
+    onclose() {
+      console.log("SSE connection closed by server. Reconnecting...");
+    },
+    onerror(err) {
+      if (err instanceof FatalError) {
+        throw err; // Stop retrying on fatal authentication errors
+      }
+      console.warn("Retrying SSE connection:", err.message);
+    },
+  });
+
+  return () => ctrl.abort();
+}
+```
+
+##### 3. Python Client (`sseclient-py` with Requests)
+
+```python
+"""
+Aura Vault Protocol — Python SSE Real-Time Event Client
+Requires: pip install requests sseclient-py
+"""
+
+import json
+import logging
+import time
+import requests
+from sseclient import SSEClient
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("AuraVaultSSE")
+
+API_BASE = "https://api-testnet.auravault.finance"
+STREAM_URL = f"{API_BASE}/api/events/stream"
+ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."  # Insert Bearer JWT
+
+
+def on_deposit(payload: dict):
+    logger.info(
+        "Deposit: Caller=%s Amount=%s NewShares=%s Ledger=%s",
+        payload.get("caller"),
+        payload.get("amount"),
+        payload.get("newShares"),
+        payload.get("ledger"),
+    )
+
+
+def on_withdraw(payload: dict):
+    logger.info(
+        "Withdrawal: Caller=%s Amount=%s SharesBurned=%s",
+        payload.get("caller"),
+        payload.get("amount"),
+        payload.get("sharesBurned"),
+    )
+
+
+def on_harvest(payload: dict):
+    logger.info(
+        "Harvest: Compounded=%s Fee=%s NewAPY=%.2f%%",
+        payload.get("harvestedAmount"),
+        payload.get("feeAmount"),
+        payload.get("apy", 0.0),
+    )
+
+
+def on_paused(payload: dict):
+    logger.warning("PAUSE EVENT: Admin=%s Reason=%s", payload.get("admin"), payload.get("reason"))
+
+
+EVENT_HANDLERS = {
+    "deposit": on_deposit,
+    "withdraw": on_withdraw,
+    "harvest": on_harvest,
+    "paused": on_paused,
+}
+
+
+def stream_vault_events():
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Accept": "text/event-stream",
+    }
+    params = {
+        "types": "deposit,withdraw,harvest,paused,unpaused",
+    }
+
+    last_event_id = None
+    backoff_seconds = 1.0
+
+    while True:
+        try:
+            req_headers = dict(headers)
+            if last_event_id:
+                req_headers["Last-Event-ID"] = last_event_id
+
+            logger.info("Connecting to SSE stream: %s", STREAM_URL)
+            response = requests.get(STREAM_URL, headers=req_headers, params=params, stream=True, timeout=(5, 60))
+
+            if response.status_code == 401:
+                logger.error("Authentication failed: token expired or invalid.")
+                break
+            elif response.status_code == 429:
+                logger.warning("Rate limit hit. Sleeping 15s...")
+                time.sleep(15)
+                continue
+
+            response.raise_for_status()
+            client = SSEClient(response)
+            backoff_seconds = 1.0  # Reset backoff on successful connection
+
+            for msg in client.events():
+                if msg.id:
+                    last_event_id = msg.id
+
+                event_type = msg.event or "message"
+                if event_type == "heartbeat":
+                    continue  # Keepalive ping
+
+                if not msg.data:
+                    continue
+
+                try:
+                    payload = json.loads(msg.data)
+                except json.JSONDecodeError:
+                    logger.warning("Failed to decode SSE JSON data: %s", msg.data)
+                    continue
+
+                handler = EVENT_HANDLERS.get(event_type)
+                if handler:
+                    handler(payload)
+                else:
+                    logger.debug("Received event [%s]: %s", event_type, payload)
+
+        except (requests.exceptions.RequestException, Exception) as exc:
+            logger.warning("Stream connection disconnected (%s). Retrying in %.1fs...", exc, backoff_seconds)
+            time.sleep(backoff_seconds)
+            backoff_seconds = min(backoff_seconds * 2, 30.0)
+
+
+if __name__ == "__main__":
+    stream_vault_events()
+```
+
+##### 4. cURL (Unbuffered CLI Stream)
+
+```bash
+curl -N -H "Accept: text/event-stream" \
+     -H "Authorization: Bearer <your-jwt-token>" \
+     "https://api-testnet.auravault.finance/api/events/stream?types=deposit,withdraw,harvest"
 ```
 
 ---
