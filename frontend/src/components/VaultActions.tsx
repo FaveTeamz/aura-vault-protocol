@@ -22,19 +22,29 @@ export default function VaultActions() {
   const [modal, setModal] = useState<Tab | null>(null);
   const [balance, setBalance] = useState("1000");
   const [depositState, setDepositState] = useState<ButtonTxState>("idle");
+  const [isPaused, setIsPaused] = useState(false);
   const [sharePrice, setSharePrice] = useState("1.0");
   const [sharePriceUpdatedAt, setSharePriceUpdatedAt] = useState<number | undefined>(undefined);
   const { markComplete } = useOnboarding();
 
   useEffect(() => {
-   useEffect(() => {
-  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/balance_of?address=mock`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => {
-      if (d?.balance) setBalance(d.balance);
-    })
-    .catch(() => {});
-}, []);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+    fetch(`${apiUrl}/api/vault/balance_of?address=mock`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.balance) setBalance(d.balance);
+      })
+      .catch(() => {});
+
+    fetch(`${apiUrl}/api/vault/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.paused !== undefined) setIsPaused(d.paused);
+        else if (d?.is_paused !== undefined) setIsPaused(d.is_paused);
+      })
+      .catch(() => {});
+  }, []);
+
   /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
@@ -102,9 +112,10 @@ export default function VaultActions() {
           data-cy="open-deposit-modal"
           txState={depositState}
           onClick={handleOpenDeposit}
+          disabled={isPaused || depositState === "pending"}
           className="w-full"
         >
-          Deposit
+          {isPaused ? "Vault Paused" : "Deposit"}
         </DepositButton>
       )}
 
