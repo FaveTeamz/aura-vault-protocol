@@ -47,12 +47,14 @@ import {
   loginSchema,
   refreshSchema,
 } from "./validation.js";
+import { metricsRouter, metricsMiddleware } from "./metrics.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(loggingMiddleware());
-app.use(globalIpRateLimiter(["/api/health"]));
+app.use(metricsMiddleware());
+app.use(globalIpRateLimiter(["/api/health", "/metrics"]));
 
 // ── A05 Security Misconfiguration: security headers (Helmet) ─────────────────
 applySecurityHeaders(app);
@@ -123,6 +125,9 @@ app.post("/api/auth/revoke-all", authenticate, userRateLimiter(), async (req, re
   await revokeAllSessions((req as any).user.sub);
   res.json({ success: true });
 });
+
+// Issue #292: Prometheus metrics endpoint — bearer-token protected
+app.use("/metrics", metricsRouter);
 
 // ── A01 Broken Access Control: all protected routes use `authenticate` ────────
 app.use("/api/webhooks", authenticate, webhookRouter);
