@@ -32,11 +32,11 @@ import {
 } from "react";
 import { AlertCircle, CheckCircle, XCircle, GripHorizontal } from "lucide-react";
 import AddressPickerInput from "./AddressPickerInput";
-
 // ─── Types ────────────────────────────────────────────────────────────────────
-
 type TxType   = "deposit" | "withdraw";
 type Step     = 1 | 2 | 3;
+type TxType = "deposit" | "withdraw" | "harvest";
+type Step = 1 | 2 | 3;
 type TxStatus = "idle" | "pending" | "success" | "error";
 
 interface Props {
@@ -98,6 +98,9 @@ export default function TransactionModal({ type, balance, onClose }: Props) {
   const [txError, setTxError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
 export default function TransactionModal({
   type,
@@ -118,51 +121,39 @@ export default function TransactionModal({
   const [retryCount,   setRetryCount]   = useState(0);
   // Controls CSS exit animation before unmounting
   const [closing,      setClosing]      = useState(false);
-
   const inputRef      = useRef<HTMLInputElement>(null);
   const sheetRef      = useRef<HTMLDivElement>(null);
   const titleId       = useRef(`tx-modal-title-${Math.random().toString(36).slice(2)}`);
-
   // ── Touch / swipe-down state ─────────────────────────────────────────────
   const touchStartY   = useRef<number | null>(null);
   const touchCurrentY = useRef<number | null>(null);
   const SWIPE_THRESHOLD = 80; // px downward to trigger dismiss
-
   // ── Body-scroll lock ─────────────────────────────────────────────────────
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
-
   // ── Escape key (desktop) ──────────────────────────────────────────────────
-  useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") triggerClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Auto-focus amount input on step 1 ────────────────────────────────────
-  useEffect(() => {
     if (step === 1) {
       // Small timeout lets the sheet animation settle first
       const t = setTimeout(() => inputRef.current?.focus(), 80);
       return () => clearTimeout(t);
     }
   }, [step]);
-
   // ── Focus trap ───────────────────────────────────────────────────────────
-  useEffect(() => {
     const sheet = sheetRef.current;
     if (!sheet) return;
-
     const focusable = sheet.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
     const first = focusable[0];
     const last  = focusable[focusable.length - 1];
-
     const trap = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       if (focusable.length === 0) { e.preventDefault(); return; }
@@ -172,17 +163,14 @@ export default function TransactionModal({
         if (document.activeElement === last)  { e.preventDefault(); first?.focus(); }
       }
     };
-
     document.addEventListener("keydown", trap);
     return () => document.removeEventListener("keydown", trap);
   }, [step, status]); // re-run when focusable elements change
-
   // ── Swipe handlers ────────────────────────────────────────────────────────
   const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     touchStartY.current   = e.touches[0]?.clientY ?? null;
     touchCurrentY.current = touchStartY.current;
   };
-
   const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
     touchCurrentY.current = e.touches[0]?.clientY ?? null;
     const delta = (touchCurrentY.current ?? 0) - (touchStartY.current ?? 0);
@@ -190,26 +178,67 @@ export default function TransactionModal({
       // Translate the sheet down as the finger drags — visual feedback
       sheetRef.current.style.transform = `translateY(${delta}px)`;
       sheetRef.current.style.transition = "none";
-    }
-  };
-
   const handleTouchEnd = () => {
-    const delta = (touchCurrentY.current ?? 0) - (touchStartY.current ?? 0);
     if (sheetRef.current) {
       sheetRef.current.style.transform = "";
       sheetRef.current.style.transition = "";
-    }
     if (delta >= SWIPE_THRESHOLD) {
       triggerClose();
-    }
     touchStartY.current   = null;
     touchCurrentY.current = null;
-  };
-
   // ── Close with exit animation ─────────────────────────────────────────────
   const triggerClose = useCallback((outcome?: "success" | "error") => {
     setClosing(true);
     setTimeout(() => onClose(outcome), 320);
+  // Focus management on mount and unmount
+    // Capture trigger element before modal takes focus
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    // Move focus into modal: first input or modal heading
+    const timer = setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      } else if (headingRef.current) {
+        headingRef.current.focus();
+      } else if (modalRef.current) {
+        modalRef.current.focus();
+    }, 30);
+    return () => {
+      clearTimeout(timer);
+      // Return focus to trigger element on close
+      triggerRef.current?.focus();
+  // Update focus when step changes
+      inputRef.current?.focus();
+    } else if (headingRef.current) {
+      headingRef.current.focus();
+  // Focus trap & Escape key
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      if (e.key === "Tab") {
+        if (!modalRef.current) return;
+        const focusableSelector =
+          'button:not([disabled]):not([aria-hidden="true"]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const focusables = Array.from(
+          modalRef.current.querySelectorAll<HTMLElement>(focusableSelector)
+        ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+        if (focusables.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const firstEl = focusables[0];
+        const lastEl = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === firstEl || !modalRef.current.contains(document.activeElement)) {
+            e.preventDefault();
+            lastEl.focus();
+          }
+        } else {
+          if (document.activeElement === lastEl) {
+            firstEl.focus();
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   // ── Gas estimate ─────────────────────────────────────────────────────────
@@ -331,6 +360,11 @@ export default function TransactionModal({
 
   // ── Derived values ────────────────────────────────────────────────────────
   const label      = type === "deposit" ? "Deposit" : "Withdraw";
+  const labelMap: Record<TxType, string> = {
+    deposit: "Deposit",
+    withdraw: "Withdraw",
+    harvest: "Harvest",
+  const label = labelMap[type] ?? "Deposit";
   const balanceNum = parseFloat(balance);
   const amountNum  = parseFloat(amount) || 0;
   const totalWithGas = amountNum + parseFloat(gasEstimate?.totalGas ?? "0");
@@ -365,7 +399,6 @@ export default function TransactionModal({
         flex items-end sm:items-center justify-center`}
       role="presentation"
       onClick={() => triggerClose()}
-    >
       {/*
        * Sheet / Modal panel.
        * Mobile:  full-width, rounded top corners, max-height 92 dvh, slides up
@@ -400,6 +433,19 @@ export default function TransactionModal({
         <div
           className="flex justify-center pt-3 pb-1 sm:hidden"
           aria-hidden="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      data-cy="tx-modal"
+        ref={modalRef}
+        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900 animate-modal-content"
+        tabIndex={-1}
+        <button
+          data-cy="modal-close"
+          onClick={onClose}
+          className="absolute right-4 top-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          aria-label="Close"
         >
           <GripHorizontal
             size={24}
@@ -415,6 +461,13 @@ export default function TransactionModal({
           >
             {label}
           </h2>
+        <h2
+          id="modal-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50 outline-none"
+          {label}
+        </h2>
 
           <button
             data-cy="modal-close"
