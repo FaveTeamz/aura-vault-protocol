@@ -15,9 +15,11 @@
  *   - Escape key closes on desktop; swipe-down closes on mobile
  *   - Focus trapped inside the sheet/modal while open
  *   - Body scroll locked while open
+ *   - Body scroll locked while open
  *
  * No horizontal overflow at 375 px viewport.
  */
+import { getStoredReferralCode, clearReferralCode } from "@/lib/referral";
 
 import {
   useState,
@@ -37,7 +39,9 @@ type TxStatus = "idle" | "pending" | "success" | "error";
 interface Props {
   type:               TxType;
   balance:            string;
+  /** Optional: current share price, used for display */
   sharePrice?:        string;
+  /** Optional: timestamp of last share price update */
   sharePriceUpdatedAt?: number;
   onClose:            (outcome?: "success" | "error") => void;
 }
@@ -236,16 +240,32 @@ export default function TransactionModal({
   async function handleSubmit(retrying = false) {
     if (!retrying) { setStatus("pending"); setTxError(""); }
     try {
-      const res  = await fetch("/api/vault/transactions/submit", {
+      // Attach the referral code (if any) as metadata on deposit transactions.
+      // The backend uses this to credit the referrer and register the referral.
+      const referralCode =
+        type === "deposit" ? getStoredReferralCode() : null;
+
+      const payload: Record<string, unknown> = { type, amount };
+      if (referralCode) {
+        payload.referralCode = referralCode;
+      }
+
+      const res = await fetch("/api/vault/transactions/submit", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ type, amount }),
+        body:    JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Transaction failed");
       setTxHash((data as { hash?: string }).hash ?? `tx-${Date.now()}`);
       setStatus("success");
       setRetryCount(0);
+
+      // Clear the stored referral code after a successful deposit so it is
+      // not re-used on subsequent transactions.
+      if (type === "deposit" && referralCode) {
+        clearReferralCode();
+      }
     } catch (err: unknown) {
       setTxError(err instanceof Error ? err.message : "Transaction failed");
       setStatus("error");

@@ -40,8 +40,10 @@ import { vaultRouter } from "./routes/vaultRoutes.js";
 import { vaultTransactionRouter } from "./routes/vaultTransactionRoutes.js";
 import { vaultRegistryRouter } from "./routes/vaultRegistryRoutes.js";
 import { startVaultSyncJob, stopVaultSyncJob } from "./services/vaultRegistryService.js";
+import { vaultSubmitRouter } from "./routes/vaultSubmitRoutes.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
+import { referralRouter } from "./routes/referralRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
 // Issue #263: Admin panel — router + middleware
 import { adminRouter } from "./routes/adminRoutes.js";
@@ -181,6 +183,12 @@ app.use("/api/v1/vault", vaultTransactionRouter);
 
 // Issue #942: Vault registry CRUD — public read, admin-only write
 app.use("/api/v1/vaults", vaultRegistryRouter);
+
+// Vault transaction submit — lightweight UI modal endpoint
+app.use("/api/vault/transactions", vaultSubmitRouter);
+
+// Referral tracking — public routes (register, stats, deposit webhook)
+app.use("/api/referrals", referralRouter);
 
 // Issue #868: OpenAPI 3.1 Spec and Swagger UI at /api/docs
 app.use("/api/docs", swaggerRouter);
