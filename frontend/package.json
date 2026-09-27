@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@coinbase/wallet-sdk": "^4.0.2",
+    "@coinbase/wallet-sdk": "^4.4.0",
     "@creit-tech/stellar-wallets-kit": "npm:@creit.tech/stellar-wallets-kit@^2.7.0",
     "@creit.tech/stellar-wallets-kit": "^2.7.0",
     "@stellar/stellar-sdk": "^16.0.1",
