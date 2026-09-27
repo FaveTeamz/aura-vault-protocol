@@ -398,6 +398,42 @@ export default function WalletConnect() {
           {loading ? "Connecting…" : "Connect Wallet"}
       </div>
     );
+  // ── Connected state ──────────────────────────────────────────────────────
+  if (connected && address) {
+        <div className="flex items-center gap-3">
+          {/* Connection indicator */}
+            aria-label="Connected"
+            className="inline-flex h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-800"
+          />
+          {/* Network badge */}
+            data-cy="network-badge"
+            className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+            {network ?? "TESTNET"}
+          {/* Truncated address */}
+            data-cy="wallet-address"
+            className="font-mono text-sm text-zinc-700 dark:text-zinc-300"
+            title={address}
+            {truncateAddress(address)}
+          {/* Disconnect */}
+          <button
+            data-cy="disconnect-wallet-btn"
+            onClick={disconnect}
+            className="ml-auto rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800 transition-colors"
+            aria-label="Disconnect wallet"
+            Disconnect
+          </button>
+  // ── Disconnected state ───────────────────────────────────────────────────
+    <div className="flex flex-col gap-3 w-full">
+      <div className="flex items-center gap-3">
+          data-cy="connect-wallet-btn"
+          onClick={connect}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300 transition-colors"
+          aria-label="Connect Freighter wallet"
+          {loading && <Spinner />}
+          {loading ? "Connecting…" : "Connect Wallet"}
+      </div>
+    );
   }
 
   // Disconnected state: trigger modal button
