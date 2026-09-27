@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Image from "next/image";
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -64,8 +65,16 @@ export default function RootLayout({
           {/* Onboarding tour — auto-starts on first visit, restartable from Settings */}
           <OnboardingTour />
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
-            <a href="/" className="text-sm font-semibold tracking-tight">
-              Aura Vault
+            <a href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+              <Image
+                src="/logo.svg"
+                alt="Aura Vault Protocol logo"
+                width={28}
+                height={28}
+                priority
+                className="rounded-lg"
+              />
+              <span>Aura Vault</span>
             </a>
             {/* Live share price ticker + wallet balance */}
             <HeaderWidgets />

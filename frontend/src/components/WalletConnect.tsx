@@ -12,6 +12,8 @@ export type WalletType = SupportedWalletId;
 export interface WalletState {
 import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
 type WalletType = "freighter" | "metamask" | "xBull" | "coinbase";
+import { WalletIcon } from "./Icons";
+type WalletType = "freighter" | "metamask" | "xBull";
 type WalletState = {
   type: WalletType;
   address: string;
@@ -628,6 +630,28 @@ export default function WalletConnect() {
         <p
           className="text-sm text-red-600 dark:text-red-400"
           data-cy="wallet-error"
+    <div className="flex flex-col gap-3 rounded-lg border p-4">
+      <div>
+        <p className="text-sm font-medium">Connect Wallet</p>
+        <p className="text-sm text-gray-500">
+          Select an installed wallet.
+        </p>
+      {wallets.length === 0 ? (
+          No supported wallet detected.
+      ) : (
+        wallets.map((type) => (
+            key={type}
+            data-testid="connect-wallet-btn"
+            type="button"
+            onClick={() => connectWallet(type)}
+            disabled={loading}
+            className="rounded-md border px-4 py-2 text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            <WalletIcon type={type} size={18} />
+            <span>{loading ? "Connecting..." : `Connect ${type}`}</span>
+        ))
+      )}
+      {error && (
+        <p className="text-sm text-red-500" role="alert">
           {error}
         </p>
       )}
