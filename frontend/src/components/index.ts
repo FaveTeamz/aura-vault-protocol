@@ -20,3 +20,6 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
+
+// Keyboard shortcuts (#269)
+export { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
