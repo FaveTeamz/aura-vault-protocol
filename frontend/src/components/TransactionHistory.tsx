@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,12 +19,14 @@ export interface Transaction {
 export interface TransactionHistoryProps {
   transactions: Transaction[];
   explorerBase?: string; // e.g. "https://stellar.expert/explorer/testnet/tx"
+  onLoadMore?: () => Promise<void> | void;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
-type PageSizeOption = (typeof PAGE_SIZE_OPTIONS)[number];
+export const INITIAL_BATCH_SIZE = 20;
+export const BATCH_SIZE = 20;
+export const SCROLL_THRESHOLD_PX = "200px";
 
 type SortField = "date" | "amount" | "status";
 type SortDir = "asc" | "desc";
@@ -55,6 +58,7 @@ function parseAmount(s: string): number {
 export default function TransactionHistory({
   transactions,
   explorerBase = "https://stellar.expert/explorer/testnet/tx",
+  onLoadMore,
 }: TransactionHistoryProps) {
   // Filters
   const [typeFilter, setTypeFilter] = useState<TxType>("all");
@@ -67,9 +71,10 @@ export default function TransactionHistory({
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Pagination
-  const [pageSize, setPageSize] = useState<PageSizeOption>(25);
-  const [page, setPage] = useState(1);
+  // Infinite Scroll State
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_BATCH_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // ── Filtering ───────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -95,12 +100,57 @@ export default function TransactionHistory({
     });
   }, [filtered, sortField, sortDir]);
 
-  // ── Pagination ──────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+  // Reset infinite scroll count when filters or sorting change
+  const resetScroll = useCallback(() => {
+    setVisibleCount(INITIAL_BATCH_SIZE);
+  }, []);
 
-  const resetPage = useCallback(() => setPage(1), []);
+  const hasMore = visibleCount < sorted.length;
+  const visibleRows = sorted.slice(0, visibleCount);
+
+  // ── Intersection Observer for Infinite Scroll ────────────────────────────
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window)) {
+      return;
+    }
+
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const firstEntry = entries[0];
+        if (firstEntry && firstEntry.isIntersecting && hasMore && !isLoadingMore) {
+          setIsLoadingMore(true);
+
+          if (onLoadMore) {
+            Promise.resolve(onLoadMore()).finally(() => {
+              setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, sorted.length));
+              setIsLoadingMore(false);
+            });
+          } else {
+            // Smooth batch loading for local transactions
+            const timer = setTimeout(() => {
+              setVisibleCount((prev) => Math.min(prev + BATCH_SIZE, sorted.length));
+              setIsLoadingMore(false);
+            }, 250);
+            return () => clearTimeout(timer);
+          }
+        }
+      },
+      {
+        root: null,
+        rootMargin: `0px 0px ${SCROLL_THRESHOLD_PX} 0px`, // trigger 200px before bottom
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, isLoadingMore, onLoadMore, sorted.length]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -109,11 +159,12 @@ export default function TransactionHistory({
       setSortField(field);
       setSortDir("desc");
     }
-    resetPage();
+    resetScroll();
   }
 
   // ── Export ──────────────────────────────────────────────────────────────
   function exportCsv() {
+    if (typeof document === "undefined" || typeof window === "undefined") return;
     const header = "date,type,amount,status,hash";
     const rows = sorted.map(
       (tx) => `${tx.date},${tx.type},${tx.amount},${tx.status},${tx.hash}`
@@ -163,7 +214,7 @@ export default function TransactionHistory({
             type="search"
             placeholder="0xabc…"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); resetPage(); }}
+            onChange={(e) => { setSearch(e.target.value); resetScroll(); }}
             className="h-9 w-52 rounded-lg border border-zinc-200 px-3 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-400"
           />
         </div>
@@ -176,7 +227,7 @@ export default function TransactionHistory({
           <select
             id="tx-type"
             value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value as TxType); resetPage(); }}
+            onChange={(e) => { setTypeFilter(e.target.value as TxType); resetScroll(); }}
             className="h-9 rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="all">All</option>
@@ -194,7 +245,7 @@ export default function TransactionHistory({
           <select
             id="tx-status"
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as TxStatus); resetPage(); }}
+            onChange={(e) => { setStatusFilter(e.target.value as TxStatus); resetScroll(); }}
             className="h-9 rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           >
             <option value="all">All</option>
@@ -213,7 +264,7 @@ export default function TransactionHistory({
             id="tx-date-from"
             type="date"
             value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); resetPage(); }}
+            onChange={(e) => { setDateFrom(e.target.value); resetScroll(); }}
             className="h-9 rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
@@ -226,7 +277,7 @@ export default function TransactionHistory({
             id="tx-date-to"
             type="date"
             value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); resetPage(); }}
+            onChange={(e) => { setDateTo(e.target.value); resetScroll(); }}
             className="h-9 rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
           />
         </div>
@@ -236,7 +287,7 @@ export default function TransactionHistory({
           <button
             onClick={() => {
               setSearch(""); setTypeFilter("all"); setStatusFilter("all");
-              setDateFrom(""); setDateTo(""); resetPage();
+              setDateFrom(""); setDateTo(""); resetScroll();
             }}
             className="h-9 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
           >
@@ -255,8 +306,11 @@ export default function TransactionHistory({
         </div>
       </div>
 
-      {/* ── Table ──────────────────────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800">
+      {/* ── Table with Mobile Touch Scroll ────────────────────────────────────── */}
+      <div
+        className="overflow-x-auto rounded-xl border border-zinc-100 dark:border-zinc-800 touch-pan-y"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         <table className="min-w-full divide-y divide-zinc-100 dark:divide-zinc-800" role="grid">
           <thead className="bg-zinc-50 dark:bg-zinc-800/50">
             <tr>
@@ -277,21 +331,22 @@ export default function TransactionHistory({
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
-            {pageRows.length === 0 ? (
+          <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800" data-testid="transaction-rows">
+            {visibleRows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-10 text-center text-sm text-zinc-400">
                   No transactions found.
                 </td>
               </tr>
             ) : (
-              pageRows.map((tx) => (
+              visibleRows.map((tx) => (
                 <tr
                   key={tx.hash}
+                  data-testid="transaction-row"
                   className="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 focus-within:bg-zinc-50 dark:focus-within:bg-zinc-800/40"
                 >
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-zinc-700 dark:text-zinc-300">
-                    {new Date(tx.date).toLocaleString()}
+                    {new Date(tx.date).toISOString().replace("T", " ").substring(0, 19)}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${TYPE_BADGE[tx.type]}`}>
@@ -324,68 +379,48 @@ export default function TransactionHistory({
         </table>
       </div>
 
-      {/* ── Pagination ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-        {/* Result count */}
+      {/* ── Infinite Scroll Sentinel & Status ──────────────────────────────────── */}
+      <div className="flex flex-col items-center justify-center">
+        {/* Loading Spinner at bottom while fetching next 20 */}
+        {isLoadingMore && (
+          <div
+            data-testid="loading-spinner"
+            role="status"
+            aria-live="polite"
+            className="flex items-center justify-center py-4 text-xs text-zinc-500 dark:text-zinc-400"
+          >
+            <LoadingSpinner size="sm" label="Loading more transactions…" />
+          </div>
+        )}
+
+        {/* Intersection Observer Sentinel (triggers 200px before bottom) */}
+        {hasMore && (
+          <div
+            ref={sentinelRef}
+            data-testid="infinite-scroll-sentinel"
+            className="h-1 w-full pointer-events-none opacity-0"
+            aria-hidden="true"
+          />
+        )}
+
+        {/* End of history message when all records are loaded */}
+        {!hasMore && sorted.length > 0 && (
+          <p
+            data-testid="end-of-history"
+            className="py-4 text-xs font-medium text-zinc-400 dark:text-zinc-500"
+          >
+            End of history
+          </p>
+        )}
+      </div>
+
+      {/* Counter summary */}
+      <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 px-1">
         <span>
           {sorted.length === 0
             ? "No results"
-            : `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} of ${sorted.length}`}
+            : `Showing ${Math.min(visibleCount, sorted.length)} of ${sorted.length} transactions`}
         </span>
-
-        {/* Page size picker */}
-        <div className="flex items-center gap-2">
-          <label htmlFor="tx-page-size" className="text-xs">Rows</label>
-          <select
-            id="tx-page-size"
-            value={pageSize}
-            onChange={(e) => { setPageSize(Number(e.target.value) as PageSizeOption); resetPage(); }}
-            className="h-8 rounded border border-zinc-200 px-2 text-sm dark:border-zinc-700 dark:bg-zinc-800"
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Page navigation */}
-        <nav aria-label="Pagination" className="flex items-center gap-1">
-          <button
-            onClick={() => setPage(1)}
-            disabled={safePage === 1}
-            className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-            aria-label="First page"
-          >
-            «
-          </button>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={safePage === 1}
-            className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-            aria-label="Previous page"
-          >
-            ‹
-          </button>
-          <span className="px-2">
-            {safePage} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={safePage === totalPages}
-            className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-            aria-label="Next page"
-          >
-            ›
-          </button>
-          <button
-            onClick={() => setPage(totalPages)}
-            disabled={safePage === totalPages}
-            className="rounded px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40"
-            aria-label="Last page"
-          >
-            »
-          </button>
-        </nav>
       </div>
     </section>
   );
