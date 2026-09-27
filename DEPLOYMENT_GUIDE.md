@@ -467,3 +467,55 @@ stellar contract invoke --id <mainnet-id> --network mainnet -- version
 **Deployment Issues**: deployment-support@aura-vault.dev
 **Emergency**: emergency@aura-vault.dev (24/7)
 **General**: support@aura-vault.dev
+
+---
+
+## Database Migration Safety Check (Issue #962)
+
+Every SQL migration file under `backend/migrations/` is automatically linted
+for backwards-incompatible changes before the deployment pipeline proceeds.
+The check runs as the **first job** in `.github/workflows/deploy.yml`, so a
+failing lint result **blocks all downstream jobs** (build, push, deploy).
+
+### What the lint script checks
+
+| Rule | Example | Why it blocks deployment |
+|---|---|---|
+| `DROP TABLE` | `DROP TABLE vault_positions;` | Destroys data; rollback is impossible |
+| `DROP COLUMN` | `ALTER TABLE t DROP COLUMN foo;` | Removes data; breaks code still reading that column |
+| `NOT NULL` without DEFAULT | `ALTER TABLE t ADD COLUMN x INT NOT NULL;` | Fails for tables with existing rows |
+| `RENAME COLUMN` | `ALTER TABLE t RENAME COLUMN a TO b;` | Breaking change for code still using the old name |
+
+### Running the check locally
+
+```bash
+cd backend
+npx ts-node scripts/lint-migrations.ts --verbose
+```
+
+Exit code `0` = safe to deploy. Exit code `1` = violations found; deployment is blocked.
+
+### Overriding for intentional breaking changes
+
+If a migration is intentionally destructive (e.g., a DROP TABLE that removes a
+fully-deprecated table after a safe two-sprint window), add a structured
+override comment **at the top of the migration file** with a required
+justification:
+
+```sql
+-- lint-migrations: allow DROP TABLE  reason: legacy payments table removed after 3-sprint deprecation; data migrated to events table in 018
+-- lint-migrations: allow DROP COLUMN reason: column sunset in API v2; all consumers updated per RFC-44
+
+BEGIN;
+DROP TABLE legacy_payments;
+...
+COMMIT;
+```
+
+The `reason:` portion is **required**. An override comment without `reason:`
+is treated as invalid and the violation is still reported.
+
+> **Important**: An override comment is an audit trail, not a bypass.
+> It communicates intent to reviewers and is logged in the CI summary.
+> Breaking changes should always be paired with a deploy runbook entry
+> describing the coordination steps (dual-read window, backfill scripts, etc.).
