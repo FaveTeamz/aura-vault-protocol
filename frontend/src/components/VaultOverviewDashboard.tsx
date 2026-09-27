@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import VaultHealthScore from './VaultHealthScore';
 import { EmptyState } from './EmptyState';
+import PortfolioPanel from '@/components/PortfolioPanel';
 
 interface VaultBalance {
   usd: number;
@@ -382,6 +383,11 @@ const VaultOverviewDashboard: React.FC = () => {
             </table>
           </div>
         </div>
+      </div>
+
+      {/* Portfolio export */}
+      <div className="mt-8">
+        <PortfolioPanel />
       </div>
     </div>
   );
