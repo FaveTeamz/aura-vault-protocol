@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORTED_LANGS } from "@/lib/i18n";
+import AddressBook from "@/components/AddressBook";
 import "@/lib/i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -396,7 +397,14 @@ export default function SettingsPage() {
         <section aria-labelledby="section-danger">
           <h2 id="section-danger" className="text-lg font-medium mb-3 text-red-600">
             {t("settings.danger.title")}
-          </h2>
+        {/* Address Book — Issue #258 */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium mb-3">Address Book</h2>
+              Save and label frequently used Stellar addresses for quick access during withdrawals.
+            <AddressBook />
+        {/* Danger Zone */}
+        <section>
+          <h2 className="text-lg font-medium mb-3 text-red-600">{t("settings.danger.title")}</h2>
           <div className="rounded-xl border border-red-200 dark:border-red-900/30 p-4 bg-red-50 dark:bg-red-950/20">
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
               {t("settings.danger.description")}

@@ -29,6 +29,7 @@ import {
   type TouchEvent,
 } from "react";
 import { AlertCircle, CheckCircle, XCircle, GripHorizontal } from "lucide-react";
+import AddressPickerInput from "./AddressPickerInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,8 @@ export default function TransactionModal({
 }: Props) {
   const [step,         setStep]         = useState<Step>(1);
   const [amount,       setAmount]       = useState(initialAmount ?? "");
+  const [recipient,    setRecipient]    = useState("");
+  const [recipientErr, setRecipientErr] = useState<string | null>(null);
   const [amountError,  setAmountError]  = useState("");
   const [status,       setStatus]       = useState<TxStatus>("idle");
   const [txHash,       setTxHash]       = useState("");
@@ -239,9 +242,27 @@ export default function TransactionModal({
     return true;
   }
 
+  function validateRecipient(): boolean {
+    // Only required for withdrawals
+    if (type !== "withdraw") return true;
+    if (!recipient.trim()) {
+      setRecipientErr("Recipient address is required");
+      return false;
+    }
+    // Basic Stellar address length / prefix check (StrKey validated in AddressPickerInput)
+    if (!/^G[A-Z2-7]{55}$/.test(recipient.trim())) {
+      setRecipientErr("Not a valid Stellar address");
+      return false;
+    }
+    setRecipientErr(null);
+    return true;
+  }
+
   // ── Step navigation ───────────────────────────────────────────────────────
   async function handleNext() {
     if (step === 1 && validateAmount()) {
+    if (step === 1 && validateAmount() && validateRecipient()) {
+      await estimateGas(amount);
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -416,6 +437,16 @@ export default function TransactionModal({
                 </span>
               </p>
 
+              {/* Issue #258: recipient address picker for withdrawals */}
+              {type === "withdraw" && (
+                <AddressPickerInput
+                  value={recipient}
+                  onChange={(addr) => { setRecipient(addr); setRecipientErr(null); }}
+                  label="Recipient address"
+                  error={recipientErr}
+                />
+              )}
+
               {/*
                * inputmode="decimal"  → numeric keyboard with decimal on iOS/Android
                * type="text"          → avoids browser spinners and step rounding
@@ -499,6 +530,14 @@ export default function TransactionModal({
                     {amount}
                   </dd>
                 </div>
+                {type === "withdraw" && recipient && (
+                  <div className="flex justify-between text-sm">
+                    <dt className="text-zinc-500">Recipient</dt>
+                    <dd className="font-mono text-xs text-zinc-700 dark:text-zinc-300 break-all text-right max-w-[60%]">
+                      {recipient}
+                    </dd>
+                  </div>
+                )}
                 {gasLoading ? (
                   <div className="flex justify-between text-sm">
                     <dt className="text-zinc-500">Est. Gas</dt>
