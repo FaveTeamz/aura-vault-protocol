@@ -17,6 +17,7 @@ import { ExplorerMenu } from "./ExplorerMenu";
 import VaultPauseBanner from "./VaultPauseBanner";
 import AdminPauseControls from "./AdminPauseControls";
 import { useVaultPause } from "@/lib/useVaultPause";
+import { PrintPortfolioButton } from "./PrintPortfolioButton";
 interface VaultStats {
   tvl: string;
   apy: string;
@@ -354,6 +355,9 @@ export default function VaultDashboard({
     return number.toLocaleString(undefined, { maximumFractionDigits: 4 });
     <main className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
       {/* ── Screen-reader live region ──────────────────────────────────────── */}
+    <main
+      className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8"
+      data-print="portfolio-root"
       <div
         role="status"
         aria-live="polite"
@@ -399,6 +403,9 @@ export default function VaultDashboard({
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           Vault Dashboard
         </h1>
+        <div className="flex items-center justify-between gap-4">
+          {/* Print button — hidden automatically in @media print via data-print-trigger */}
+          <PrintPortfolioButton />
         <p className="text-sm text-zinc-500">
           Real-time overview of your Aura vault positions.
       {/* Portfolio */}
@@ -424,7 +431,7 @@ export default function VaultDashboard({
             role="region"
             aria-label="Vault statistics"
             <StatCard
-              testId="total-assets"
+              data-cy="stat-tvl"
               label="TVL"
               value={fmtNumber(stats!.tvl)}
               rawValue={parseFloat(stats!.tvl)}
@@ -432,6 +439,7 @@ export default function VaultDashboard({
               sub="Total Value Locked"
             />
               testId="apy"
+              data-cy="stat-apy"
               label="APY"
               value={`${fmtNumber(stats!.apy)}%`}
               rawValue={parseFloat(stats!.apy)}
@@ -439,6 +447,7 @@ export default function VaultDashboard({
               suffix="%"
               sub="Annualized yield"
               testId="share-balance"
+              data-cy="stat-balance"
               label="Your Balance"
               value={fmtNumber(stats!.userBalance)}
               rawValue={parseFloat(stats!.userBalance)}
@@ -457,6 +466,8 @@ export default function VaultDashboard({
               <AnimatedShareBalance
                 value={fmtNumber(stats!.userShares)}
                 className="font-mono text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
+              data-cy="stat-shares"
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Your Shares</span>
               <span className="text-xs text-zinc-400">
                 <AnimatedShareBalance
                   value={stats!.pricePerShare}

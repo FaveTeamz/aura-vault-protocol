@@ -85,3 +85,4 @@ export type { ExplorerMenuProps } from "./ExplorerMenu";
   type ToastOptions,
 } from "./toast";
 export * from "./Icons";
+export { PrintPortfolioButton } from "./PrintPortfolioButton";
