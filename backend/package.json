@@ -7,7 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:fuzz": "vitest run src/validation.fuzz.test.ts",
+    "test:retry": "vitest run src/queue.retry.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.726.0",
@@ -19,15 +21,18 @@
     "handlebars": "^4.7.9",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@pact-foundation/pact": "^13.1.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
+    "fast-check": "^3.22.0",
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
