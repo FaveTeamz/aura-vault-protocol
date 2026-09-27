@@ -7,6 +7,7 @@ declare global {
   namespace Express {
     interface Request {
       requestId: string;
+      correlationId?: string;
     }
     interface Response {
       /**
@@ -38,8 +39,33 @@ export function responseEnvelopeMiddleware(
   res: Response,
   next: NextFunction
 ): void {
-  // Attach a unique request ID to every request
-  req.requestId = uuidv4();
+  const correlationId =
+    req.correlationId ??
+    (req.headers["x-correlation-id"] as string | undefined) ??
+    req.requestId ??
+    uuidv4();
+  req.correlationId = correlationId;
+  req.requestId = correlationId;
+  res.setHeader("X-Correlation-ID", correlationId);
+
+  const sendJson = res.json.bind(res);
+  res.json = (body: any) => {
+    if (
+      res.statusCode >= 400 &&
+      body !== null &&
+      typeof body === "object" &&
+      !Array.isArray(body)
+    ) {
+      body = {
+        ...body,
+        meta: {
+          ...(body.meta && typeof body.meta === "object" ? body.meta : {}),
+          correlationId,
+        },
+      };
+    }
+    return sendJson(body);
+  };
 
   // ── res.success() helper ─────────────────────────────────────────────────
   res.success = function (data: unknown, statusCode = 200): void {
@@ -48,6 +74,7 @@ export function responseEnvelopeMiddleware(
       data,
       meta: {
         requestId: req.requestId,
+        correlationId,
         timestamp: new Date().toISOString(),
         version: "1.0.0",
       },
@@ -70,6 +97,7 @@ export function responseEnvelopeMiddleware(
       },
       meta: {
         requestId: req.requestId,
+        correlationId,
         timestamp: new Date().toISOString(),
         version: "1.0.0",
       },

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { getRedis } from "./redis.js";
+import { logger } from "./logger.js";
 
 export const NS = {
   AUTH_BLACKLIST: "auth:blacklist",
@@ -27,6 +28,9 @@ export const NS = {
   YIELD_HISTORY: "yield:history",
   // Vault simulation
   VAULT_SIMULATE: "vault:simulate",
+  ANALYTICS_LEADERBOARD: "analytics:leaderboard",
+  ANALYTICS_APY: "analytics:apy",
+  ANALYTICS_USER_VOLUME: "analytics:user-volume",
 } as const;
 
 export type Namespace = (typeof NS)[keyof typeof NS];
@@ -48,7 +52,10 @@ async function track(ns: string, hit: boolean): Promise<void> {
 export async function cacheGet<T>(ns: string, id: string): Promise<T | null> {
   const value = await getRedis().get(key(ns, id));
   await track(ns, value !== null);
-  if (value === null) return null;
+  if (value === null) {
+    logger.warn({ namespace: ns, cacheKey: id }, "Redis cache miss");
+    return null;
+  }
   return JSON.parse(value) as T;
 }
 
@@ -63,6 +70,118 @@ export async function cacheSet(
 
 export async function cacheDel(ns: string, id: string): Promise<void> {
   await getRedis().del(key(ns, id));
+}
+
+export async function cacheHashGet<T>(
+  ns: string,
+  id: string,
+  field: string
+): Promise<T | null> {
+  const value = await getRedis().hget(key(ns, id), field);
+  await track(ns, value !== null);
+  if (value === null) {
+    logger.warn({ namespace: ns, cacheKey: id, field }, "Redis hash cache miss");
+    return null;
+  }
+  return JSON.parse(value) as T;
+}
+
+export async function cacheHashGetAll<T>(
+  ns: string,
+  id: string
+): Promise<Record<string, T> | null> {
+  const values = await getRedis().hgetall(key(ns, id));
+  const fields = Object.keys(values);
+  await track(ns, fields.length > 0);
+  if (fields.length === 0) {
+    logger.warn({ namespace: ns, cacheKey: id }, "Redis hash cache miss");
+    return null;
+  }
+  return Object.fromEntries(
+    fields.map((field) => [field, JSON.parse(values[field]) as T])
+  );
+}
+
+export async function cacheHashSet<T>(
+  ns: string,
+  id: string,
+  field: string,
+  value: T,
+  ttlSeconds: number
+): Promise<void> {
+  const redis = getRedis();
+  const cacheKey = key(ns, id);
+  await redis.hset(cacheKey, field, JSON.stringify(value));
+  await redis.expire(cacheKey, ttlSeconds);
+}
+
+export async function cacheHashSetMany<T>(
+  ns: string,
+  id: string,
+  fields: Record<string, T>,
+  ttlSeconds: number
+): Promise<void> {
+  if (Object.keys(fields).length === 0) return;
+  const redis = getRedis();
+  const cacheKey = key(ns, id);
+  const serialized = Object.fromEntries(
+    Object.entries(fields).map(([field, value]) => [field, JSON.stringify(value)])
+  );
+  await redis.hset(cacheKey, serialized);
+  await redis.expire(cacheKey, ttlSeconds);
+}
+
+export async function cacheHashDel(ns: string, id: string): Promise<void> {
+  await getRedis().del(key(ns, id));
+}
+
+export async function cacheHashFieldDel(
+  ns: string,
+  id: string,
+  field: string
+): Promise<void> {
+  await getRedis().hdel(key(ns, id), field);
+}
+
+export interface SortedCacheEntry {
+  member: string;
+  score: number;
+}
+
+export async function cacheSortedSetGet(
+  ns: string,
+  id: string
+): Promise<SortedCacheEntry[] | null> {
+  const cacheKey = key(ns, id);
+  const values = await getRedis().zrevrange(cacheKey, 0, -1, "WITHSCORES");
+  await track(ns, values.length > 0);
+  if (values.length === 0) {
+    logger.warn({ namespace: ns, cacheKey: id }, "Redis sorted-set cache miss");
+    return null;
+  }
+  const entries: SortedCacheEntry[] = [];
+  for (let index = 0; index < values.length; index += 2) {
+    if (values[index] !== "__empty__") {
+      entries.push({ member: values[index], score: Number(values[index + 1]) });
+    }
+  }
+  return entries;
+}
+
+export async function cacheSortedSetSet(
+  ns: string,
+  id: string,
+  entries: SortedCacheEntry[],
+  ttlSeconds: number
+): Promise<void> {
+  const redis = getRedis();
+  const cacheKey = key(ns, id);
+  await redis.del(cacheKey);
+  const values = entries.length > 0
+    ? entries.flatMap(({ member, score }) => [score, member])
+    : [0, "__empty__"];
+  await redis.zadd(cacheKey, ...values);
+  await redis.expire(cacheKey, ttlSeconds);
 }
 
 // Redis SET operations for session tracking
@@ -119,4 +238,17 @@ export async function getCacheStats(): Promise<
     };
   }
   return result;
+}
+
+export async function cacheStatsPrometheusText(): Promise<string> {
+  const stats = await getCacheStats();
+  const lines = [
+    "# HELP aura_cache_hit_ratio Cache hits divided by total cache lookups",
+    "# TYPE aura_cache_hit_ratio gauge",
+  ];
+  for (const [namespace, values] of Object.entries(stats)) {
+    const label = namespace.replaceAll('\\', "\\\\").replaceAll('"', '\\"');
+    lines.push(`aura_cache_hit_ratio{namespace="${label}"} ${values.hitRate}`);
+  }
+  return `${lines.join("\n")}\n`;
 }

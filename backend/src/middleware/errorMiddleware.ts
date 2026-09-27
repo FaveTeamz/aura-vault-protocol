@@ -69,6 +69,8 @@ export function errorHandler(
     },
     meta: {
       requestId: (req as Request & { requestId?: string }).requestId ?? "unknown",
+      correlationId:
+        (req as Request & { correlationId?: string }).correlationId ?? "unknown",
       timestamp: new Date().toISOString(),
       version: "1.0.0",
     },

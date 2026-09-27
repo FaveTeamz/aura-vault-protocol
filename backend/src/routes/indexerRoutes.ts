@@ -19,6 +19,8 @@ import {
   type VaultEvent,
 } from "../services/eventIndexer.js";
 import { logger } from "../logger.js";
+import { dispatchEvent } from "../webhook.js";
+import { invalidateAnalyticsCaches } from "../services/analyticsCache.js";
 
 export const indexerRouter = Router();
 
@@ -48,7 +50,9 @@ indexerRouter.post(
         typeof e.id !== "string" ||
         typeof e.ledgerSequence !== "number" ||
         typeof e.ledgerTimestamp !== "number" ||
-        typeof e.type !== "string"
+        typeof e.type !== "string" ||
+        ((e.type === "pause" || e.type === "unpause") &&
+          typeof e.callerAddress !== "string")
     );
     if (invalid.length > 0) {
       res.status(400).json({
@@ -63,6 +67,34 @@ indexerRouter.post(
         events as VaultEvent[],
         new NoopDbAdapter()
       );
+
+      for (const event of events as VaultEvent[]) {
+        await invalidateAnalyticsCaches(
+          event.callerAddress,
+          event.contractId
+        ).catch((err) => {
+          logger.warn({ err, eventId: event.id }, "Analytics cache invalidation failed");
+        });
+        if (event.type !== "pause" && event.type !== "unpause") continue;
+
+        const rawPayload =
+          typeof event.rawPayload === "object" && event.rawPayload !== null
+            ? (event.rawPayload as Record<string, unknown>)
+            : {};
+        const reason =
+          rawPayload.reason === undefined || rawPayload.reason === null
+            ? undefined
+            : String(rawPayload.reason);
+
+        dispatchEvent(
+          event.type === "pause" ? "vault.paused" : "vault.unpaused",
+          {
+            timestamp: new Date(event.ledgerTimestamp * 1000).toISOString(),
+            admin_address: event.callerAddress,
+            ...(reason ? { reason } : {}),
+          }
+        );
+      }
 
       const metrics = getIndexerMetrics();
       const lagExceeded =

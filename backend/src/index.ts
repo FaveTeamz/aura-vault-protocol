@@ -30,9 +30,21 @@ import { yieldRouter } from "./routes/yieldRoutes.js";
 import { queueRouter } from "./routes/queueRoutes.js";
 import { startWorker, stopWorker } from "./queue.js";
 import { analyticsRouter } from "./routes/analyticsRoutes.js";
+import { apyRouter } from "./routes/apyRoutes.js";
 import { warmCache } from "./services/defi.js";
+import {
+  startAnalyticsCacheWarmer,
+  stopAnalyticsCacheWarmer,
+} from "./services/analyticsCache.js";
+import { cacheStatsPrometheusText } from "./cache.js";
+import { responseEnvelopeMiddleware } from "./middleware/responseEnvelope.js";
+import { errorHandler } from "./middleware/errorMiddleware.js";
 import { runCacheWarmup, getWarmupStatus } from "./services/cacheWarmup.js";
 import { startEmailWorker, stopEmailWorker } from "./services/emailQueue.js";
+import {
+  startUserExportWorker,
+  stopUserExportWorker,
+} from "./services/userExportService.js";
 import { startYieldWorker, stopYieldWorker } from "./services/yieldWorker.js";
 import { startHarvestRepeatableJob, stopHarvestRepeatableJob } from "./services/harvestRepeatableJob.js";
 import { startAlertEvaluationJob, stopAlertEvaluationJob } from "./services/alertEvaluationJob.js";
@@ -44,6 +56,8 @@ import { vaultSubmitRouter } from "./routes/vaultSubmitRoutes.js";
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
 import { referralRouter } from "./routes/referralRoutes.js";
+import { userExportRouter } from "./routes/userExportRoutes.js";
+import { indexerRouter } from "./routes/indexerRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
 // Issue #263: Admin panel — router + middleware
 import { adminRouter } from "./routes/adminRoutes.js";
@@ -97,6 +111,7 @@ app.use(loggingMiddleware());
 app.use(metricsMiddleware());
 
 app.use(express.json({ limit: "1mb" }));
+app.use(responseEnvelopeMiddleware);
 
 // Global IP rate limiter — health check and metrics excluded so load-balancer probes and scrapers are not throttled
 app.use(globalIpRateLimiter(["/api/health", "/metrics"]));
@@ -176,7 +191,10 @@ app.use("/api/v1/vault", vaultRouter);
 app.use("/api/vault/leaderboard", leaderboardRouter);
 // Issue #318: User preferences — requires authentication
 app.use("/api/users/preferences", authenticate, userPreferencesRouter);
+app.use("/api/users/export", userExportRouter);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/v1/vault/apy", apyRouter);
+app.use("/api/v1/indexer", indexerRouter);
 
 // Issue #302: Vault transaction endpoints (deposit / withdraw / harvest)
 app.use("/api/v1/vault", vaultTransactionRouter);
@@ -236,15 +254,30 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
+app.get("/metrics/cache", async (_req, res) => {
+  try {
+    res.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    res.send(await cacheStatsPrometheusText());
+  } catch (err) {
+    logger.error({ err }, "Failed to render cache metrics");
+    res.status(500).send("# error generating cache metrics\n");
+  }
+});
+
+app.use(errorLoggingMiddleware);
+app.use(errorHandler);
+
 const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 const server = app.listen(PORT, () => {
   void autoMigrate();         // issue #293: run pending SQL migrations on startup
   startWorker();
   startEmailWorker();
+  startUserExportWorker();
   startYieldWorker();
   startVaultSyncJob();        // issue #942: background TVL/APY sync for vault registry
   void startHarvestRepeatableJob(); // issue #944: BullMQ repeatable harvest cron job
   void startAlertEvaluationJob();  // issue #946: alert threshold evaluation every 5 min
+  startAnalyticsCacheWarmer();
   void warmCache();           // existing DeFi price warm-up
   void runCacheWarmup();      // issue #325: vault stats / share price / top depositors
   logger.info({ port: PORT }, `Aura Vault backend running on port ${PORT}`);
@@ -254,10 +287,12 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, `[shutdown] received ${signal}`);
   stopWorker();
   stopEmailWorker();
+  stopUserExportWorker();
   stopYieldWorker();
   stopVaultSyncJob();         // issue #942
   await stopHarvestRepeatableJob(); // issue #944
   await stopAlertEvaluationJob();  // issue #946
+  stopAnalyticsCacheWarmer();
   await shutdownTracing();
   server.close(async () => {
     await disconnectRedis().catch((err) => {

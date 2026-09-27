@@ -25,8 +25,15 @@
 import pino from "pino";
 import pinoHttp from "pino-http";
 import { randomUUID } from "crypto";
+import { AsyncLocalStorage } from "async_hooks";
 import type { Request, Response, NextFunction } from "express";
 import { serverConfig } from "./config/index.js";
+
+const requestContext = new AsyncLocalStorage<{ correlationId: string }>();
+
+export function getCorrelationId(): string | undefined {
+  return requestContext.getStore()?.correlationId;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sensitive field paths to redact from all log output
@@ -92,6 +99,11 @@ export const logger = pino({
     env: serverConfig.nodeEnv,
   },
 
+  mixin() {
+    const correlationId = getCorrelationId();
+    return correlationId ? { correlationId } : {};
+  },
+
   // Redact sensitive fields before writing
   redact: {
     paths: REDACTED_PATHS,
@@ -107,27 +119,27 @@ export const logger = pino({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Attaches a correlationId to the request object and echoes it on the response
- * as X-Request-ID.  Uses the incoming X-Request-ID header when present; falls
- * back to a fresh UUID v4 otherwise.
+ * Attaches a correlationId to the request and echoes it in both correlation
+ * headers. Uses an incoming ID when present, otherwise generates a UUID v4.
  *
  * Must be registered BEFORE the request logger so pino-http can pick up the ID.
  */
 export function correlationIdMiddleware() {
   return (req: Request, res: Response, next: NextFunction): void => {
     const existingId =
-      (req.headers["x-request-id"] as string | undefined) ||
-      (req.headers["x-correlation-id"] as string | undefined);
+      (req.headers["x-correlation-id"] as string | undefined) ||
+      (req.headers["x-request-id"] as string | undefined);
 
     const correlationId = existingId ?? randomUUID();
 
     // Attach to the request so downstream handlers can access it
     (req as Request & { correlationId: string }).correlationId = correlationId;
 
-    // Echo on the response for client-side tracing
+    // Keep the legacy header while standardizing on X-Correlation-ID.
+    res.setHeader("X-Correlation-ID", correlationId);
     res.setHeader("X-Request-ID", correlationId);
 
-    next();
+    requestContext.run({ correlationId }, next);
   };
 }
 

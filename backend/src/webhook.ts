@@ -31,6 +31,130 @@ import { successResponse, errorResponse } from "./dto/index.js";
 import { logger } from "./logger.js";
 
 export { signPayload, dispatchWebhookEvent };
+// ── Types ────────────────────────────────────────────────────────────────────
+export type EventType =
+  | "deposit"
+  | "withdraw"
+  | "harvest"
+  | "pause"
+  | "unpause"
+  | "vault.paused"
+  | "vault.unpaused"
+  | "upgrade"
+  | "suspicious";
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  secret: string;
+  events: EventType[];        // empty = subscribe to all
+  createdAt: string;
+}
+export interface WebhookEvent {
+  type: EventType;
+  payload: Record<string, unknown>;
+export interface DeliveryRecord {
+  endpointId: string;
+  eventId: string;
+  status: "pending" | "success" | "failed";
+  attempts: number;
+  nextRetryAt: string | null;
+  lastStatusCode: number | null;
+  updatedAt: string;
+// ── In-memory stores ─────────────────────────────────────────────────────────
+const endpoints = new Map<string, WebhookEndpoint>();
+const events    = new Map<string, WebhookEvent>();
+const deliveries = new Map<string, DeliveryRecord>();
+// Per-endpoint rate limiter: max 100 dispatches per 60 s
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT  = 100;
+const RATE_WINDOW = 60_000;
+// ── Helpers ──────────────────────────────────────────────────────────────────
+export function sign(secret: string, body: string): string {
+  return "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
+function isRateLimited(endpointId: string): boolean {
+  const now = Date.now();
+  let bucket = rateBuckets.get(endpointId);
+  if (!bucket || now > bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + RATE_WINDOW };
+    rateBuckets.set(endpointId, bucket);
+  }
+  if (bucket.count >= RATE_LIMIT) return true;
+  bucket.count++;
+  return false;
+// ── Delivery with exponential backoff (retries for 24 h) ─────────────────────
+const MAX_RETRY_MS = 24 * 60 * 60 * 1000;
+// Delays: 10 s, 30 s, 1 m, 5 m, 15 m, 1 h, 3 h, 6 h → covers 24 h window
+const BACKOFF_MS = [10_000, 30_000, 60_000, 300_000, 900_000, 3_600_000, 10_800_000, 21_600_000];
+async function attemptDelivery(delivery: DeliveryRecord, endpoint: WebhookEndpoint, event: WebhookEvent): Promise<void> {
+  if (isRateLimited(endpoint.id)) {
+    // Re-queue after current rate-limit window resets
+    const bucket = rateBuckets.get(endpoint.id)!;
+    delivery.nextRetryAt = new Date(bucket.resetAt).toISOString();
+    delivery.updatedAt   = new Date().toISOString();
+    scheduleRetry(delivery, endpoint, event, bucket.resetAt - Date.now());
+    return;
+  const body = JSON.stringify({ id: event.id, type: event.type, payload: event.payload, createdAt: event.createdAt });
+  delivery.attempts++;
+  delivery.updatedAt = new Date().toISOString();
+  try {
+    const res = await fetch(endpoint.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Aura-Signature": sign(endpoint.secret, body),
+        "X-Aura-Event": event.type,
+        "X-Aura-Delivery": delivery.id,
+      },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+    delivery.lastStatusCode = res.status;
+    if (res.ok) {
+      delivery.status      = "success";
+      delivery.nextRetryAt = null;
+    } else {
+      scheduleNextRetry(delivery, endpoint, event);
+    }
+  } catch {
+    delivery.lastStatusCode = null;
+    scheduleNextRetry(delivery, endpoint, event);
+function scheduleNextRetry(delivery: DeliveryRecord, endpoint: WebhookEndpoint, event: WebhookEvent): void {
+  const isPauseEvent = event.type === "vault.paused" || event.type === "vault.unpaused";
+  if (isPauseEvent && delivery.attempts >= 4) {
+    delivery.status = "failed";
+    delivery.nextRetryAt = null;
+  const delay = isPauseEvent
+    ? 1_000 * 2 ** (delivery.attempts - 1)
+    : BACKOFF_MS[Math.min(delivery.attempts - 1, BACKOFF_MS.length - 1)];
+  const createdAt = new Date(delivery.createdAt).getTime();
+  if (Date.now() + delay - createdAt > MAX_RETRY_MS) {
+    delivery.status      = "failed";
+  scheduleRetry(delivery, endpoint, event, delay);
+function scheduleRetry(delivery: DeliveryRecord, endpoint: WebhookEndpoint, event: WebhookEvent, delayMs: number): void {
+  delivery.nextRetryAt = new Date(Date.now() + delayMs).toISOString();
+  setTimeout(() => attemptDelivery(delivery, endpoint, event), delayMs);
+// ── Public dispatch API ───────────────────────────────────────────────────────
+export function dispatchEvent(type: EventType, payload: Record<string, unknown>): WebhookEvent {
+  const event: WebhookEvent = { id: uuidv4(), type, payload, createdAt: new Date().toISOString() };
+  events.set(event.id, event);
+  for (const endpoint of endpoints.values()) {
+    if (endpoint.events.length > 0 && !endpoint.events.includes(type)) continue;
+    const delivery: DeliveryRecord = {
+      id:             uuidv4(),
+      endpointId:     endpoint.id,
+      eventId:        event.id,
+      status:         "pending",
+      attempts:       0,
+      nextRetryAt:    null,
+      lastStatusCode: null,
+      createdAt:      new Date().toISOString(),
+      updatedAt:      new Date().toISOString(),
+    };
+    deliveries.set(delivery.id, delivery);
+    // fire-and-forget
+    attemptDelivery(delivery, endpoint, event);
+  return event;
+// ── REST router ───────────────────────────────────────────────────────────────
 
 export const webhookRouter = Router();
 

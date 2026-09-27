@@ -10,6 +10,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import { getCorrelationId } from "./logger.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,9 +93,12 @@ async function fireWebhook(url: string, payload: unknown): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export function enqueue(data: TxJobData): TxJob {
+  const correlationId = getCorrelationId();
   const job: TxJob = {
     id: uuidv4(),
-    data,
+    data: correlationId
+      ? { ...data, meta: { ...data.meta, correlationId } }
+      : data,
     status: "waiting",
     attempts: 0,
     createdAt: Date.now(),

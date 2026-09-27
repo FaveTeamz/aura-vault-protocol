@@ -290,6 +290,34 @@ To unsubscribe: {{unsubscribeUrl}}
 `,
 };
 
+const GDPR_DATA_EXPORT_READY: TemplateDefinition = {
+  defaultSubject: 'Your Aura Vault data export is ready',
+  html: layout('Your Data Export Is Ready', `
+    ${greeting()}
+    <p style="color:#c0c0d0;font-size:15px;margin:0 0 24px;">
+      Your requested data export is ready to download. This private link expires at {{expiresAt}}.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="{{downloadUrl}}" style="display:inline-block;background:#16856f;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;text-decoration:none;">
+        Download your data
+      </a>
+    </div>
+    <p style="color:#6b6b80;font-size:13px;margin:0;">
+      This link grants access to your export. Do not forward or share it.
+    </p>
+  `),
+  text: `Aura Vault — Your Data Export Is Ready
+
+Hi {{userName}},
+
+Your requested data export is ready: {{downloadUrl}}
+
+This private link expires at {{expiresAt}}. Do not forward or share it.
+
+To unsubscribe: {{unsubscribeUrl}}
+`,
+};
+
 const PORTFOLIO_DIGEST: TemplateDefinition = {
   defaultSubject: 'Your Daily Aura Vault Summary',
   html: layout('Daily Portfolio Summary', `
@@ -339,5 +367,6 @@ export const EMAIL_TEMPLATES: Record<EmailTemplate, TemplateDefinition> = {
   'security-alert': SECURITY_ALERT,
   'welcome': WELCOME,
   'gdpr-erasure-confirmation': GDPR_ERASURE_CONFIRMATION,
+  'gdpr-data-export-ready': GDPR_DATA_EXPORT_READY,
   'portfolio-digest': PORTFOLIO_DIGEST,
 };
