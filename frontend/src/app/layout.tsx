@@ -58,6 +58,7 @@ export const metadata: Metadata = {
             </div>
             <div className="flex items-center gap-4 shrink-0">
                   className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
                 >
                   Settings
                 </a>

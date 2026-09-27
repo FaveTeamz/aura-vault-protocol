@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
 import VaultDashboard from "@/components/VaultDashboard";
+"use client";
+
+import { useWalletStore } from "@/lib/walletStore";
+import "@/lib/i18n";
+import PortfolioPanel from "@/components/PortfolioPanel";
+import VaultActions from "@/components/VaultActions";
+import CopyButton from "@/components/CopyButton";
+import { truncateAddress } from "@/components/WalletConnect";
 
 export const metadata: Metadata = {
   title: "Aura Vault",
@@ -7,12 +15,6 @@ export const metadata: Metadata = {
 };
 export default function Home() {
   return <VaultDashboard />;
-import { useWalletStore } from "@/lib/walletStore";
-import "@/lib/i18n";
-import PortfolioPanel from "@/components/PortfolioPanel";
-import VaultActions from "@/components/VaultActions";
-import CopyButton from "@/components/CopyButton";
-import { truncateAddress } from "@/components/WalletConnect";
   const { address, connected } = useWalletStore();
   return (
     <div className="flex flex-col flex-1 bg-zinc-50 dark:bg-zinc-950">

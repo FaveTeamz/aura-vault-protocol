@@ -362,37 +362,6 @@ export default function WalletConnect() {
         </button>
       </div>
     );
-  }
-
-  // Disconnected state: trigger modal button
-    <>
-        <div>
-          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Connect Wallet
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Connect with Freighter, Lobstr, or xBull via Stellar Wallets Kit.
-          data-testid="connect-wallet-btn"
-          onClick={() => {
-            refreshInstalledWallets();
-            setIsModalOpen(true);
-          }}
-          className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
-          <Wallet size={16} />
-          Connect Wallet
-        {error && (
-          <p className="text-xs text-red-500" role="alert">
-            {error}
-        )}
-      <WalletSelectionModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        wallets={walletList}
-        onSelectWallet={handleSelectWallet}
-        isConnecting={loading}
-        connectingWalletId={connectingId}
-        errorMessage={error}
-        kitFallbackActive={isKitFallback}
-    </>
   // ── Connected state ──────────────────────────────────────────────────────
   if (connected && address) {
         <div className="flex items-center gap-3">
@@ -427,6 +396,39 @@ export default function WalletConnect() {
           aria-label="Connect Freighter wallet"
           {loading && <Spinner />}
           {loading ? "Connecting…" : "Connect Wallet"}
+      </div>
+    );
+  }
+
+  // Disconnected state: trigger modal button
+    <>
+        <div>
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            Connect Wallet
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Connect with Freighter, Lobstr, or xBull via Stellar Wallets Kit.
+          data-testid="connect-wallet-btn"
+          onClick={() => {
+            refreshInstalledWallets();
+            setIsModalOpen(true);
+          }}
+          className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
+          <Wallet size={16} />
+          Connect Wallet
+        {error && (
+          <p className="text-xs text-red-500" role="alert">
+            {error}
+        )}
+      <WalletSelectionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        wallets={walletList}
+        onSelectWallet={handleSelectWallet}
+        isConnecting={loading}
+        connectingWalletId={connectingId}
+        errorMessage={error}
+        kitFallbackActive={isKitFallback}
+    </>
       {error && !error.includes("not found") && (
         <p
           className="text-sm text-red-600 dark:text-red-400"
