@@ -19,6 +19,17 @@ type WalletState = {
   connected: boolean;
 }
 export interface WalletConnectProps {
+type WalletType = "freighter" | "metamask" | "xBull" | "coinbase" | "walletconnect";
+const STORAGE_KEY = "aura_wallet_state";
+const LAST_WALLET_KEY = "aura_last_wallet_type";
+export type WalletState = {
+  type?: WalletType;
+  address?: string | null;
+  network?: string | null;
+  connected?: boolean;
+  walletType?: WalletType | string | null;
+};
+type WalletConnectProps = {
   onConnected?: () => void;
   onDisconnected?: () => void;
 const STORAGE_KEY = "aura_wallet_state";
@@ -27,6 +38,8 @@ export function truncate(address: string): string {
   if (!address || address.length <= 10) return address || "";
 };
 function truncate(address: string) {
+function truncate(address?: string | null) {
+  if (!address) return "";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 /**
  * Supported wallet definitions with metadata and install instructions
@@ -182,6 +195,17 @@ export default function WalletConnect({
   }, [refreshInstalledWallets]);
   // Handle wallet connection selection
   const handleSelectWallet = async (walletId: SupportedWalletId) => {
+  // Hydration-safe: Detect wallets and restore persisted wallet state on client mount only
+    detectWallets();
+    if (typeof window === "undefined") return;
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.address || parsed.connected)) {
+          setWallet(parsed);
+      // Ignore storage errors in restricted iframe/private mode
+  }, [detectWallets]);
+  async function connectWallet(type: WalletType) {
     setLoading(true);
     setConnectingId(walletId);
     setError(null);
@@ -238,6 +262,18 @@ export default function WalletConnect({
         if (!address) {
           throw new Error("No Freighter address was returned.");
           address,
+        const state: WalletState = {
+          connected: true,
+          walletType: type,
+        setWallet(state);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(LAST_WALLET_KEY, type);
+          } catch {
+            // Ignore storage errors
+        markComplete("connect_wallet");
+        setShowDropdown(false);
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -287,6 +323,22 @@ export default function WalletConnect() {
       const connResult = await isConnected();
       if (!connResult.isConnected) {
         setDisconnected();
+          : "Failed to connect to Freighter"
+    } finally {
+      setLoading(false);
+  function disconnectWallet() {
+    setWallet(null);
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(LAST_WALLET_KEY);
+        // ignore
+    onDisconnected?.();
+  const connectMetaMask = useCallback(async () => {
+      const w = window as unknown as Record<string, unknown>;
+      const ethereum = w.ethereum as
+        | Record<string, (...args: unknown[]) => Promise<unknown>>
+        | undefined;
+      if (!ethereum) {
+        setError("MetaMask not found. Please install the extension.");
         return;
       const addrResult = await getAddress();
       if (addrResult.error || !addrResult.address) {

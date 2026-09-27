@@ -33,6 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    /*
+      suppressHydrationWarning is strictly necessary on <html> because ThemeProvider and LanguageSwitcher
+      dynamically modify the root html element's class ("dark") and attributes ("lang", "dir") on the client
+      based on localStorage and system color scheme preferences (prefers-color-scheme).
+      Next.js and React specifically recommend suppressHydrationWarning for <html> in themes/i18n to prevent
+      root-level attribute mismatch warnings while preserving full hydration validation for children.
+    */
     <html
       lang="en"
       dir="ltr"
