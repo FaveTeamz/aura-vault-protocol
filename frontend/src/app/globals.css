@@ -126,6 +126,19 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Bottom-sheet (mobile modal) — Issue #259 ── */
+/* Slides up from the bottom of the viewport on small screens */
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* Slides back down when dismissed */
+@keyframes sheet-out {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
 /* ── Scale + fade for button press ── */
 @keyframes press-down {
   from { transform: scale(1); opacity: 1; }
@@ -151,6 +164,9 @@ body {
 .animate-bounce-subtle  { animation: bounce-subtle  1.2s  ease-in-out infinite; }
 .animate-swipe-up       { animation: swipe-up       400ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 .animate-swipe-down     { animation: swipe-down     400ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+/* Bottom-sheet entry/exit — Issue #259 */
+.animate-sheet-in       { animation: sheet-in       380ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-sheet-out      { animation: sheet-out      320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
 .animate-press-down     { animation: press-down     150ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 .animate-press-up       { animation: press-up       150ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 

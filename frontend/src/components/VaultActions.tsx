@@ -71,6 +71,7 @@ export default function VaultActions({
   /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
+   * Signature matches TransactionModal's onClose prop: (outcome?) => void
    */
   function handleModalClose(type: Tab, outcome?: "success" | "error") {
     setModal(null);
@@ -164,7 +165,7 @@ export default function VaultActions({
           balance={balance}
           sharePrice={sharePrice}
           sharePriceUpdatedAt={sharePriceUpdatedAt}
-          onClose={() => handleModalClose(modal)}
+          onClose={(outcome) => handleModalClose(modal, outcome)}
         />
       )}
     </section>
