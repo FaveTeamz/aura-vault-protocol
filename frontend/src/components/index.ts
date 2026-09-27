@@ -1,5 +1,6 @@
 // Default exports
 export { default as SharePriceChart } from "./SharePriceChart";
+export { default as NavHeader } from "./NavHeader";
 export { default as WalletConnect } from "./WalletConnect";
 export { default as TransactionModal } from "./TransactionModal";
 export { default as PreSignBreakdown } from "./PreSignBreakdown";

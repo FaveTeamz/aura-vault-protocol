@@ -11,6 +11,8 @@ import ProgressBar from "@/components/ProgressBar";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { HeaderWidgets } from "@/components/HeaderWidgets";
 import { ToastProvider } from "@/components/toast";
+import NavHeader from "@/components/NavHeader";
+import { NotificationProvider, NotificationCenter } from "@/components/notifications";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "Aura Vault Protocol",
@@ -97,6 +99,11 @@ export default function RootLayout({
                 <ThemeToggle />
               </div>
             </header>
+          <NotificationProvider>
+            {/* Unified responsive navigation header — #242
+                Desktop (≥768px): logo + nav links + wallet button
+                Mobile  (<768px): logo + hamburger → slide-in drawer      */}
+            <NavHeader />
             {children}
           </ToastProvider>
         </ThemeProvider>
