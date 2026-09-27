@@ -21,7 +21,7 @@
 
 import { Router, Request, Response } from "express";
 import { authenticate } from "../middleware/authMiddleware.js";
-import { userRateLimiter } from "../middleware/rateLimitMiddleware.js";
+import { userRateLimiter, transactionRateLimiter } from "../middleware/rateLimitMiddleware.js";
 import { validateXdr } from "../middleware/validateXdrMiddleware.js";
 import { validate } from "../validation.js";
 import {
@@ -92,6 +92,7 @@ vaultTransactionRouter.post(
   "/deposit",
   authenticate,
   userRateLimiter(),
+  transactionRateLimiter(),
   idempotency(),
   validateXdr(),
   validate(vaultDepositSchema),
@@ -134,6 +135,7 @@ vaultTransactionRouter.post(
   "/withdraw",
   authenticate,
   userRateLimiter(),
+  transactionRateLimiter(),
   idempotency(),
   validateXdr(),
   validate(vaultWithdrawSchema),
@@ -176,6 +178,7 @@ vaultTransactionRouter.post(
   "/harvest",
   authenticate,
   userRateLimiter(),
+  transactionRateLimiter(),
   idempotency(),
   validateXdr(),
   validate(vaultHarvestSchema),

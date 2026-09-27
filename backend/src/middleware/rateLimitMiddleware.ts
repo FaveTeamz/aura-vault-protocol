@@ -1,3 +1,20 @@
+/**
+ * Rate Limiting Middleware — Issue #289
+ *
+ * Implements per-IP and per-user token bucket rate limiters backed by Redis.
+ * All counters are stored in Redis so limits are consistent across multiple
+ * server instances.
+ *
+ * Limits enforced:
+ *  - Global IP limit:       200 req/min per IP (health check exempt)
+ *  - Auth endpoints:         10 req/min per IP
+ *  - Transaction endpoints:  30 req/min per authenticated user
+ *  - Tiered user limit:      60 req/min (free) / 600 req/min (paid)
+ *
+ * All 429 responses include a Retry-After header (seconds until next token).
+ * Redis errors fail open — availability is prioritised over strict enforcement.
+ */
+
 import { logger } from "../logger.js";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { getRedis } from "../redis.js";
@@ -16,17 +33,41 @@ interface BucketResult {
   retryAfter: number;
 }
 
-export const TIER_LIMITS: Record<Tier, BucketConfig> = {
-  free: { capacity: 60, refillRate: 1 },     // 60 req/min steady-state
-  paid: { capacity: 600, refillRate: 10 },    // 600 req/min steady-state
+// ─────────────────────────────────────────────────────────────────────────────
+// Bucket configurations — all limits expressed in req/min
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Global: 200 req/min per IP */
+export const GLOBAL_IP_LIMIT: BucketConfig = {
+  capacity: 200,
+  refillRate: 200 / 60, // ≈ 3.33 tokens/s
 };
 
-const IP_LIMIT: BucketConfig = { capacity: 30, refillRate: 0.5 };        // 30/min
-const AUTH_LIMIT: BucketConfig = { capacity: 20, refillRate: 20 / 900 }; // 20/15 min
+/** Auth endpoints: 10 req/min per IP */
+export const AUTH_IP_LIMIT: BucketConfig = {
+  capacity: 10,
+  refillRate: 10 / 60, // ≈ 0.167 tokens/s
+};
 
-// Atomic token bucket implemented as a Lua script to eliminate race conditions.
+/** Transaction endpoints: 30 req/min per authenticated user */
+export const TRANSACTION_USER_LIMIT: BucketConfig = {
+  capacity: 30,
+  refillRate: 30 / 60, // 0.5 tokens/s
+};
+
+/** Tiered user limits */
+export const TIER_LIMITS: Record<Tier, BucketConfig> = {
+  free: { capacity: 60, refillRate: 1 },     // 60 req/min
+  paid: { capacity: 600, refillRate: 10 },    // 600 req/min
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Atomic token bucket Lua script
+// ─────────────────────────────────────────────────────────────────────────────
+
 // KEYS[1] — Redis hash key for this bucket
-// ARGV[1] — capacity, ARGV[2] — refillRate (tokens/sec), ARGV[3] — now (ms), ARGV[4] — TTL (s)
+// ARGV[1] — capacity, ARGV[2] — refillRate (tokens/sec), ARGV[3] — now (ms),
+// ARGV[4] — TTL (s)
 // Returns: [allowed (0|1), remaining_floor, capacity_floor, retry_after_ceil]
 const TOKEN_BUCKET_LUA = `
 local key      = KEYS[1]
@@ -63,12 +104,15 @@ redis.call('EXPIRE', key, ttl)
 return {allowed, math.floor(tokens), math.floor(capacity), retry_after}
 `;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Core token bucket implementation
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function consumeToken(
   redisKey: string,
-  config: BucketConfig
+  config: BucketConfig,
 ): Promise<BucketResult> {
   const now = Date.now();
-  // TTL slightly longer than full-refill time so keys self-clean
   const ttl = Math.ceil(config.capacity / config.refillRate) + 60;
 
   const raw = (await getRedis().eval(
@@ -78,7 +122,7 @@ async function consumeToken(
     config.capacity,
     config.refillRate,
     now,
-    ttl
+    ttl,
   )) as [number, number, number, number];
 
   return {
@@ -89,9 +133,13 @@ async function consumeToken(
   };
 }
 
-function applyHeaders(res: Response, result: BucketResult, config: BucketConfig): void {
+function applyRateLimitHeaders(
+  res: Response,
+  result: BucketResult,
+  config: BucketConfig,
+): void {
   const secondsToFull = Math.ceil(
-    (config.capacity - result.remaining) / config.refillRate
+    (config.capacity - result.remaining) / config.refillRate,
   );
   res.set({
     "X-RateLimit-Limit": String(result.limit),
@@ -102,35 +150,52 @@ function applyHeaders(res: Response, result: BucketResult, config: BucketConfig)
 
 function clientIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  if (typeof forwarded === "string") return forwarded.split(",")[0]!.trim();
   return req.socket.remoteAddress ?? "unknown";
 }
 
-// IP-based token bucket. keyPrefix isolates auth limits from global limits.
+// ─────────────────────────────────────────────────────────────────────────────
+// Exported middleware factories
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * IP-based token bucket limiter.
+ * keyPrefix isolates different limit tiers (global vs auth).
+ */
 export function ipRateLimiter(
-  config: BucketConfig = IP_LIMIT,
-  keyPrefix = "rl:global:ip"
+  config: BucketConfig = GLOBAL_IP_LIMIT,
+  keyPrefix = "rl:global:ip",
 ): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const redisKey = `${keyPrefix}:${clientIp(req)}`;
     try {
       const result = await consumeToken(redisKey, config);
-      applyHeaders(res, result, config);
+      applyRateLimitHeaders(res, result, config);
       if (!result.allowed) {
         res.set("Retry-After", String(result.retryAfter));
-        res.status(429).json({ error: "Too many requests", retryAfter: result.retryAfter });
+        res.status(429).json({
+          success: false,
+          error: {
+            code: "RATE_LIMIT_EXCEEDED",
+            message: "Too many requests",
+            retryAfter: result.retryAfter,
+          },
+        });
         return;
       }
       next();
     } catch (err) {
-      // Fail open on Redis errors — availability > strict enforcement
-      logger.error({ err: (err as Error).message }, "[RateLimit] Redis error");
+      // Fail open — Redis unavailability must not block legitimate traffic
+      logger.error({ err: (err as Error).message }, "[RateLimit] Redis error — failing open");
       next();
     }
   };
 }
 
-// Per-user tiered limiter. Must run after the authenticate middleware sets req.user.
+/**
+ * Per-user tiered limiter (free / paid).
+ * Must run after authenticate middleware which sets req.user.
+ */
 export function userRateLimiter(): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const user = (req as any).user as { sub: string; tier?: Tier } | undefined;
@@ -142,32 +207,77 @@ export function userRateLimiter(): RequestHandler {
 
     try {
       const result = await consumeToken(redisKey, config);
-      applyHeaders(res, result, config);
+      applyRateLimitHeaders(res, result, config);
       if (!result.allowed) {
         res.set("Retry-After", String(result.retryAfter));
         res.status(429).json({
-          error: "Rate limit exceeded",
-          tier,
-          retryAfter: result.retryAfter,
+          success: false,
+          error: {
+            code: "RATE_LIMIT_EXCEEDED",
+            message: "Rate limit exceeded",
+            tier,
+            retryAfter: result.retryAfter,
+          },
         });
         return;
       }
       next();
     } catch (err) {
-      logger.error({ err: (err as Error).message }, "[RateLimit] Redis error");
+      logger.error({ err: (err as Error).message }, "[RateLimit] Redis error — failing open");
       next();
     }
   };
 }
 
-// Tight IP-based limiter for auth endpoints (20 req / 15 min).
+/**
+ * Auth endpoint limiter: 10 req/min per IP.
+ * Applied to POST /api/auth/login and POST /api/auth/refresh.
+ */
 export function authRateLimiter(): RequestHandler {
-  return ipRateLimiter(AUTH_LIMIT, "rl:auth:ip");
+  return ipRateLimiter(AUTH_IP_LIMIT, "rl:auth:ip");
 }
 
-// Global IP limiter suitable for use as app.use(), with an optional path exclusion list.
+/**
+ * Transaction endpoint limiter: 30 req/min per authenticated user.
+ * Applied to deposit / withdraw / harvest routes.
+ */
+export function transactionRateLimiter(): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const user = (req as any).user as { sub: string } | undefined;
+    if (!user) { next(); return; }
+
+    const redisKey = `rl:txn:user:${user.sub}`;
+    try {
+      const result = await consumeToken(redisKey, TRANSACTION_USER_LIMIT);
+      applyRateLimitHeaders(res, result, TRANSACTION_USER_LIMIT);
+      if (!result.allowed) {
+        res.set("Retry-After", String(result.retryAfter));
+        res.status(429).json({
+          success: false,
+          error: {
+            code: "RATE_LIMIT_EXCEEDED",
+            message: "Transaction rate limit exceeded",
+            retryAfter: result.retryAfter,
+          },
+        });
+        return;
+      }
+      next();
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, "[RateLimit] Redis error — failing open");
+      next();
+    }
+  };
+}
+
+/**
+ * Global IP limiter suitable for app.use() with optional path exclusions.
+ * Health check paths are excluded by default (callers may extend the list).
+ *
+ * @param excludePaths - Exact paths to skip (e.g. ["/api/health"])
+ */
 export function globalIpRateLimiter(excludePaths: string[] = []): RequestHandler {
-  const limiter = ipRateLimiter();
+  const limiter = ipRateLimiter(GLOBAL_IP_LIMIT, "rl:global:ip");
   return (req: Request, res: Response, next: NextFunction): void => {
     if (excludePaths.includes(req.path)) { next(); return; }
     limiter(req, res, next);
