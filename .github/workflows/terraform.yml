@@ -109,6 +109,36 @@ jobs:
             -input=false \
             -no-color 2>&1 | tee plan-output.txt
 
+      # ── Destroy-protection guard ────────────────────────────────────────────
+      # Warn (and fail on production) if the plan would destroy any resource
+      # protected by lifecycle { prevent_destroy = true }.  Terraform itself
+      # will already abort the plan for those resources, but this step makes
+      # the intent explicit in the PR diff and CI log.
+      - name: Check for protected-resource destruction
+        if: always() && steps.plan.outcome != 'skipped'
+        run: |
+          PROTECTED_RESOURCES=(
+            "aws_db_instance.main"
+            "aws_s3_bucket.postgres_backup"
+            "aws_vpc.main"
+            "aws_route53_zone.main"
+          )
+          FOUND=false
+          for res in "${PROTECTED_RESOURCES[@]}"; do
+            if grep -qE "# ${res}.*will be destroyed" plan-output.txt 2>/dev/null; then
+              echo "::error::🚨 Protected resource targeted for DESTROY: ${res}"
+              FOUND=true
+            fi
+          done
+          if [ "$FOUND" = "true" ]; then
+            echo "::error::One or more protected production resources are scheduled for destruction."
+            echo "::error::See terraform/destroy-protection.tf for the intentional teardown procedure."
+            # Fail hard on production; warn-only on staging
+            if [ "${{ matrix.module }}" = "production" ]; then
+              exit 1
+            fi
+          fi
+
       - name: Post plan summary to PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v9
