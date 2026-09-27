@@ -72,24 +72,38 @@ spec:
             limits:
               cpu: "1000m"
               memory: "1Gi"
+          # Startup probe: allows up to 60s for the backend to initialise
+          # (6 failures × 10s period = 60s maximum startup window)
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+            successThreshold: 1
+          # Liveness probe: checked every 30s; 3 consecutive failures restart the pod
           livenessProbe:
             httpGet:
               path: /api/health
               port: http
               scheme: HTTP
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 0
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
             successThreshold: 1
+          # Readiness probe: /api/ready performs Redis + DB connectivity checks
           readinessProbe:
             httpGet:
               path: /api/ready
               port: http
               scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
             successThreshold: 1
           volumeMounts:

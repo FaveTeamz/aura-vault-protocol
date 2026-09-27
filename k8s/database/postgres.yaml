@@ -99,18 +99,28 @@ spec:
             limits:
               cpu: "2000m"
               memory: "2Gi"
+          # Startup probe: gives Postgres up to 60s to finish initialising data dir
+          # (6 failures × 10s period = 60s maximum startup window)
+          startupProbe:
+            exec:
+              command: ["pg_isready", "-U", "aura", "-d", "aura_vault"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+            successThreshold: 1
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "aura", "-d", "aura_vault"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 0
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "aura", "-d", "aura_vault"]
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 0
+            periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
       volumes:
