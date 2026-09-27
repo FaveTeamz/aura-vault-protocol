@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import VaultDashboard from "@/components/VaultDashboard";
 "use client";
@@ -8,6 +9,8 @@ import PortfolioPanel from "@/components/PortfolioPanel";
 import VaultActions from "@/components/VaultActions";
 import CopyButton from "@/components/CopyButton";
 import { truncateAddress } from "@/components/WalletConnect";
+import DeepLinkHandler from "@/components/DeepLinkHandler";
+import { Skeleton } from "@/components/Skeleton";
 
 export const metadata: Metadata = {
   title: "Aura Vault",
@@ -70,5 +73,33 @@ export default function Home() {
               <PortfolioPanel />
       </main>
     </div>
+/**
+ * Home page — Issue #262: deep-link support for pre-filled deposit/withdraw.
+ *
+ * DeepLinkHandler uses useSearchParams() which requires a Suspense boundary
+ * in Next.js App Router (the hook opts the subtree into dynamic rendering).
+ * The fallback renders skeleton cards so the layout doesn't shift on load.
+ */
+    <Suspense fallback={<HomeSkeleton />}>
+      <DeepLinkHandler />
+    </Suspense>
+  );
+}
+function HomeSkeleton() {
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
+      {/* Header skeleton */}
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      {/* Stats grid skeleton */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      {/* Actions skeleton */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <Skeleton className="h-32 rounded-xl" />
+    </main>
   );
 }

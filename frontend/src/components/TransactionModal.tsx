@@ -42,8 +42,13 @@ interface Props {
   /** Optional: current share price, used for display */
   sharePrice?:        string;
   /** Optional: timestamp of last share price update */
+  type:                 TxType;
+  balance:              string;
+  sharePrice?:          string;
   sharePriceUpdatedAt?: number;
-  onClose:            (outcome?: "success" | "error") => void;
+  /** Issue #262: pre-fill the amount input from a deep-link query param. */
+  initialAmount?:       string;
+  onClose:              (outcome?: "success" | "error") => void;
 }
 interface GasEstimate {
   baseFee:     string;
@@ -92,10 +97,11 @@ export default function TransactionModal({ type, balance, sharePrice = "1.0", sh
 export default function TransactionModal({
   type,
   balance,
+  initialAmount,
   onClose,
 }: Props) {
   const [step,         setStep]         = useState<Step>(1);
-  const [amount,       setAmount]       = useState("");
+  const [amount,       setAmount]       = useState(initialAmount ?? "");
   const [amountError,  setAmountError]  = useState("");
   const [status,       setStatus]       = useState<TxStatus>("idle");
   const [txHash,       setTxHash]       = useState("");

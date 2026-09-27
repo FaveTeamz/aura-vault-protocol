@@ -13,6 +13,7 @@ import {
   type ShortcutAction,
 } from "@/lib/useKeyboardShortcuts";
 import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
+import type { DeepLinkAction } from "@/lib/useDeepLink";
 interface VaultStats {
   tvl: string;
   apy: string;
@@ -192,6 +193,13 @@ const MOCK_TXS: Transaction[] = [
     hash: "dead1234beef",
 ];
 export default function VaultDashboard() {
+export default function VaultDashboard({
+  initialAction = null,
+  initialAmount = null,
+  onDeepLinkHandled,
+  initialAction?: DeepLinkAction | null;
+  initialAmount?: string | null;
+  onDeepLinkHandled?: () => void;
   const [stats, setStats] = useState<VaultStats | null>(null);
   const [txs] = useState<Transaction[]>(MOCK_TXS);
   const [loading, setLoading] = useState(true);
@@ -444,6 +452,9 @@ export default function VaultDashboard() {
       {/* ── Transactions ───────────────────────────────────────────────────── */}
       <section aria-labelledby="tx-heading" className="relative z-50">
           <VaultActions />
+            initialAction={initialAction}
+            initialAmount={initialAmount}
+            onDeepLinkHandled={onDeepLinkHandled}
       {/* Transactions */}
         aria-labelledby="tx-heading"
         className="relative z-50"

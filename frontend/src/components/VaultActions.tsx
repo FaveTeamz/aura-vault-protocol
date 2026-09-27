@@ -8,16 +8,22 @@
  *   - Spinner while a deposit is pending
  *   - Checkmark on success (auto-resets after 2 s)
  *   - × on failure (auto-resets after 2 s)
- *
  * #269: accepts an optional `externalModal` prop so that keyboard
  * shortcuts registered in a parent component can open a modal
  * without pointer interaction.
+ * VaultActions — Issue #478 + #262
+ * Issue #478: DepositButton shows spinner / checkmark / × states.
+ * Issue #262: Accepts `initialAction` and `initialAmount` props so external
+ *   deep-links (?action=deposit&amount=100) can pre-open the modal with a
+ *   pre-filled amount. After the modal closes the caller's `onDeepLinkHandled`
+ *   callback fires so the parent can strip the query params from the URL.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import TransactionModal from "./TransactionModal";
 import DepositButton, { type ButtonTxState } from "./DepositButton";
 import { useOnboarding } from "@/components/OnboardingChecklist";
+import type { DeepLinkAction } from "@/lib/useDeepLink";
 
 type Tab = "deposit" | "withdraw";
 
@@ -31,7 +37,6 @@ interface VaultActionsProps {
   /** Called after an externally-triggered modal has been closed. */
   onExternalModalClose?: () => void;
 }
-
 export default function VaultActions({
   externalModal,
   onExternalModalClose,
@@ -44,12 +49,33 @@ export default function VaultActions({
   const [sharePriceUpdatedAt, setSharePriceUpdatedAt] = useState<
     number | undefined
   >(undefined);
+interface Props {
+  /** Pre-open this modal type on first render (from deep-link). */
+  initialAction?: DeepLinkAction | null;
+  /** Pre-fill the amount input (from deep-link). */
+  initialAmount?: string | null;
+  /** Called once after the deep-link-triggered modal is closed so the parent
+   *  can remove the query params from the canonical URL. */
+  onDeepLinkHandled?: () => void;
+  initialAction = null,
+  initialAmount = null,
+  onDeepLinkHandled,
+}: Props) {
+  const [tab,                setTab]                = useState<Tab>(initialAction ?? "deposit");
+  const [modal,              setModal]              = useState<Tab | null>(null);
+  const [balance,            setBalance]            = useState("1000");
+  const [depositState,       setDepositState]       = useState<ButtonTxState>("idle");
+  const [sharePrice,         setSharePrice]         = useState("1.0");
+  const [sharePriceUpdatedAt, setSPUpdatedAt]       = useState<number | undefined>(undefined);
+  const deepLinkFired = useRef(false);
   const { markComplete } = useOnboarding();
 
+  // Fetch live balance
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/balance_of?address=mock`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
+      .then((d: { balance?: string } | null) => {
         if (d?.balance) setBalance(d.balance);
       })
       .catch(() => {});
@@ -65,15 +91,24 @@ export default function VaultActions({
       setModal(externalModal);
     }
   }, [externalModal]);
-  /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
    * Signature matches TransactionModal's onClose prop: (outcome?) => void
-   */
   function handleModalClose(type: Tab, outcome?: "success" | "error") {
     setModal(null);
     // Notify the parent that an externally-triggered modal has closed.
     onExternalModalClose?.();
+  // Issue #262: open modal from deep-link on first render only
+    if (deepLinkFired.current) return;
+    if (!initialAction) return;
+    deepLinkFired.current = true;
+    // Switch the visible tab to match the action
+    setTab(initialAction);
+    // For deposit, drive the animated button state through pending
+    if (initialAction === "deposit") setDepositState("pending");
+    setModal(initialAction);
+  }, [initialAction]);
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
     if (type === "deposit") {
       markComplete("make_first_deposit");
@@ -84,8 +119,17 @@ export default function VaultActions({
         setDepositState("error");
         setTimeout(() => setDepositState("idle"), 2000);
       } else {
+        // Dismissed without completing
         setDepositState("idle");
       }
+    }
+
+    // Issue #262: notify parent to strip query params from the canonical URL.
+    // Only fires once — when the deep-link-triggered modal is closed.
+    if (deepLinkFired.current) {
+      onDeepLinkHandled?.();
+      // Reset so subsequent manual opens don't retrigger the callback
+      deepLinkFired.current = false;
     }
   }
 
@@ -93,6 +137,8 @@ export default function VaultActions({
     setDepositState("pending");
     setModal("deposit");
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <section className="w-full rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
@@ -132,7 +178,7 @@ export default function VaultActions({
         </span>
       </p>
 
-      {/* Deposit tab — uses animated DepositButton */}
+      {/* Deposit tab */}
       {tab === "deposit" && (
         <DepositButton
           data-cy="open-deposit-modal"
@@ -144,7 +190,7 @@ export default function VaultActions({
         </DepositButton>
       )}
 
-      {/* Withdraw tab — standard button */}
+      {/* Withdraw tab */}
       {tab === "withdraw" && (
         <button
           data-cy="open-withdraw-modal"
@@ -155,13 +201,14 @@ export default function VaultActions({
         </button>
       )}
 
-      {/* Modal */}
+      {/* Modal — passes initialAmount so TransactionModal can pre-fill Step 1 */}
       {modal && (
         <TransactionModal
           type={modal}
           balance={balance}
           sharePrice={sharePrice}
           sharePriceUpdatedAt={sharePriceUpdatedAt}
+          initialAmount={modal === initialAction ? (initialAmount ?? undefined) : undefined}
           onClose={(outcome) => handleModalClose(modal, outcome)}
           onClose={() => handleModalClose(modal)}
         />
