@@ -2,6 +2,18 @@
 export { default as SharePriceChart } from "./SharePriceChart";
 export { default as NavHeader } from "./NavHeader";
 export { default as WalletConnect } from "./WalletConnect";
+
+// Freighter network mismatch — #248
+export {
+  FreighterNetworkProvider,
+  FreighterNetworkBanner,
+  useNetworkMismatch,
+} from "./FreighterNetworkBanner";
+// Empty states
+export { EmptyState } from "./EmptyState";
+export type { EmptyStateProps, EmptyVariant } from "./EmptyState";
+export { OnboardingChecklist, useOnboarding } from "./OnboardingChecklist";
+export type { ChecklistItemId } from "./OnboardingChecklist";
 export { default as TransactionModal } from "./TransactionModal";
 export { default as PreSignBreakdown } from "./PreSignBreakdown";
 export { default as PerformanceCharts } from "./PerformanceCharts";
