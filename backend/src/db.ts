@@ -279,3 +279,10 @@ export async function closePools(): Promise<void> {
   writePool = null;
   readPool = null;
 }
+
+/** Query facade retained for services that use the shared database API. */
+export const db = {
+  query<T extends pg.QueryResultRow = any>(text: string, values?: unknown[]) {
+    return getWritePool().query<T>(text, values as any[] | undefined);
+  },
+};

@@ -31,6 +31,7 @@ export interface TokenPayload {
   deviceId?: string;
   tier?: Tier;
   scope?: string;
+  role?: string;
 }
 
 export interface TokenPair {
