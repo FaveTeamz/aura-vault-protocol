@@ -69,6 +69,7 @@ import {
   getRedisCircuitBreakerState,
   getRedisCircuitBreakerStats,
 } from "./services/redisCircuitBreakerService.js";
+import { metricsRouter, metricsMiddleware } from "./metrics.js";
 
 const app = express();
 
@@ -87,11 +88,12 @@ app.use(cors(corsOptions));
 app.use(correlationIdMiddleware());
 app.use(createRequestLogger());
 app.use(loggingMiddleware());
+app.use(metricsMiddleware());
 
 app.use(express.json({ limit: "1mb" }));
 
-// Global IP rate limiter — health check excluded so load-balancer probes are not throttled
-app.use(globalIpRateLimiter(["/api/health"]));
+// Global IP rate limiter — health check and metrics excluded so load-balancer probes and scrapers are not throttled
+app.use(globalIpRateLimiter(["/api/health", "/metrics"]));
 
 // ── Issue #869: Graceful Degradation — monitor circuit breaker states ────────
 app.use(degradationStatusMiddleware);
@@ -151,6 +153,9 @@ app.post("/api/auth/revoke-all", authenticate, userRateLimiter(), async (req, re
   await revokeAllSessions((req as any).user.sub);
   res.json({ success: true });
 });
+
+// Issue #292: Prometheus metrics endpoint — bearer-token protected
+app.use("/metrics", metricsRouter);
 
 // ── A01 Broken Access Control: all protected routes use `authenticate` ────────
 app.use("/api/webhooks", authenticate, webhookRouter);
