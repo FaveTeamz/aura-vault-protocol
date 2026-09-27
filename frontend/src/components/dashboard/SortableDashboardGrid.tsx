@@ -38,6 +38,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { HeroCard } from "./HeroCard";
 import { ApyCard, DepositorCountCard, LastHarvestCard } from "./MetricCards";
 import { UserPositionCard, type UserPosition } from "./UserPositionCard";
+import { HarvestButton } from "@/components/HarvestButton";
 import {
   useWidgetLayout,
   type WidgetId,
@@ -54,6 +55,8 @@ interface VaultStats {
   depositorCount: number | null;
   lastHarvestAt: number | null;
   lastHarvestAmount: string | null;
+  /** Total vault shares — used to gate the keeper harvest button */
+  totalShares: number;
 }
 
 interface SortableWidgetProps {
@@ -63,6 +66,8 @@ interface SortableWidgetProps {
   loading: boolean;
   /** True while this specific item is being dragged */
   isDragging: boolean;
+  /** Called after a successful harvest to trigger a stats refresh */
+  onRefresh?: () => void;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -91,11 +96,14 @@ function WidgetContent({
   stats,
   position,
   loading,
+  onRefresh,
 }: {
   id: WidgetId;
   stats: VaultStats | null;
   position: UserPosition | null;
   loading: boolean;
+  /** Called after a successful harvest to trigger a stats refresh */
+  onRefresh?: () => void;
 }) {
   switch (id) {
     case "hero":
@@ -118,11 +126,17 @@ function WidgetContent({
       );
     case "last-harvest":
       return (
-        <LastHarvestCard
-          lastHarvestAt={stats?.lastHarvestAt ?? null}
-          lastHarvestAmount={stats?.lastHarvestAmount ?? null}
-          isLoading={loading}
-        />
+        <div className="flex flex-col gap-3">
+          <LastHarvestCard
+            lastHarvestAt={stats?.lastHarvestAt ?? null}
+            lastHarvestAmount={stats?.lastHarvestAmount ?? null}
+            isLoading={loading}
+          />
+          <HarvestButton
+            totalShares={stats?.totalShares ?? 0}
+            onHarvestComplete={onRefresh}
+          />
+        </div>
       );
     case "user-position":
       return <UserPositionCard position={position} isLoading={loading} />;
@@ -139,6 +153,7 @@ function SortableWidget({
   position,
   loading,
   isDragging,
+  onRefresh,
 }: SortableWidgetProps) {
   const {
     attributes,
@@ -208,6 +223,7 @@ function SortableWidget({
         stats={stats}
         position={position}
         loading={loading}
+        onRefresh={onRefresh}
       />
     </div>
   );
@@ -310,6 +326,7 @@ export function SortableDashboardGrid() {
         depositorCount: metrics.totalUsers ?? metrics.depositorCount ?? null,
         lastHarvestAt: metrics.lastHarvestAt ?? null,
         lastHarvestAmount: metrics.lastHarvestAmount ?? null,
+        totalShares: metrics.totalShares ?? assets.totalShares ?? 0,
       });
 
       if (assets.userBalance && assets.userShares) {
@@ -446,6 +463,7 @@ export function SortableDashboardGrid() {
                 position={position}
                 loading={loading}
                 isDragging={activeId !== null}
+                onRefresh={fetchStats}
               />
             ))}
           </div>
