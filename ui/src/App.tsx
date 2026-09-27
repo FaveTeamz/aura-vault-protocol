@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from "react";
 import { Toast } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ContractErrorBoundary } from "./components/ContractErrorBoundary";
 import { OnboardingFlow, hasCompletedOnboarding } from "./components/OnboardingFlow";
 import { EmptyState } from "./components/EmptyState";
 import { Skeleton } from "./components/Skeleton";
@@ -42,6 +43,10 @@ export default function App() {
    * After a successful deposit the parent would update this value.
    */
   const [shareBalance] = useState<number>(0);
+
+  // In a real app this would come from a wallet-connection context/hook.
+  // Kept as undefined here so the boundary still works without a connected wallet.
+  const walletAddress: string | undefined = undefined;
 
   const notify = (msg: ToastMessage) => setToast(msg);
 
@@ -88,12 +93,14 @@ export default function App() {
                 aria-labelledby={`tab-${tab}`}
                 className="tab-panel"
               >
-                <Suspense fallback={<Skeleton rows={3} />}>
-                  {tab === "deposit" && <DepositForm onToast={notify} />}
-                  {tab === "withdraw" && <WithdrawForm onToast={notify} />}
-                  {tab === "harvest" && <HarvestPanel onToast={notify} />}
-                  {tab === "performance" && <PerformanceCharts />}
-                </Suspense>
+                <ContractErrorBoundary walletAddress={walletAddress}>
+                  <Suspense fallback={<Skeleton rows={3} />}>
+                    {tab === "deposit" && <DepositForm onToast={notify} />}
+                    {tab === "withdraw" && <WithdrawForm onToast={notify} />}
+                    {tab === "harvest" && <HarvestPanel onToast={notify} />}
+                    {tab === "performance" && <PerformanceCharts />}
+                  </Suspense>
+                </ContractErrorBoundary>
               </div>
             </>
           )}
