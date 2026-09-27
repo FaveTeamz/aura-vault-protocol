@@ -8,6 +8,7 @@
     "cy:run:chrome": "cypress run --browser chrome",
     "cy:run:firefox": "cypress run --browser firefox",
     "cy:run:edge": "cypress run --browser edge",
+    "cy:run:a11y": "cypress run --spec 'cypress/e2e/a11y.cy.ts'",
     "pw:install": "playwright install --with-deps",
     "pw:test": "playwright test",
     "pw:test:ui": "playwright test --ui",
@@ -15,6 +16,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
-    "cypress": "^13.13.0"
+    "axe-core": "^4.9.1",
+    "cypress": "^13.13.0",
+    "cypress-axe": "^1.5.0"
   }
 }
