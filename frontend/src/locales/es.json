@@ -24,9 +24,19 @@
   "settings": {
     "title": "Configuración",
     "saved": "Configuración guardada",
+    "reset_defaults": "Restablecer valores predeterminados",
     "appearance": {
       "title": "Apariencia",
       "description": "Elige tu tema de color preferido."
+    },
+    "language": {
+      "title": "Idioma",
+      "description": "Elige tu idioma preferido. Los cambios se aplican de inmediato."
+    },
+    "currency": {
+      "title": "Moneda",
+      "description": "Elige cómo se muestran los saldos y el rendimiento.",
+      "note": "Los precios se obtienen de feeds de mercado y son solo informativos."
     },
     "wallet": {
       "title": "Billetera Conectada",
@@ -44,7 +54,11 @@
       "vault_events": "Alertas de rendimiento del vault",
       "email": "Notificaciones por correo",
       "email_address": "Dirección de correo",
-      "email_placeholder": "tu@ejemplo.com"
+      "email_placeholder": "tu@ejemplo.com",
+      "push_title": "Notificaciones push del navegador",
+      "push_description": "Recibe una notificación cuando ocurra un evento de cosecha en el vault.",
+      "push_blocked": "Las notificaciones push están bloqueadas. Actualiza los permisos del sitio.",
+      "push_unsupported": "Las notificaciones push no son compatibles con este navegador."
     },
     "security": {
       "title": "Seguridad",

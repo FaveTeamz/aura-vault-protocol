@@ -24,9 +24,19 @@
   "settings": {
     "title": "设置",
     "saved": "设置已保存",
+    "reset_defaults": "重置为默认值",
     "appearance": {
       "title": "外观",
       "description": "选择您偏好的颜色主题。"
+    },
+    "language": {
+      "title": "语言",
+      "description": "选择您偏好的显示语言，更改立即生效。"
+    },
+    "currency": {
+      "title": "货币显示",
+      "description": "选择金库余额和收益的显示方式。",
+      "note": "价格来自市场数据源，仅供参考。"
     },
     "wallet": {
       "title": "已连接钱包",
@@ -44,7 +54,11 @@
       "vault_events": "金库性能警报",
       "email": "电子邮件通知",
       "email_address": "电子邮件地址",
-      "email_placeholder": "您@示例.com"
+      "email_placeholder": "您@示例.com",
+      "push_title": "浏览器推送通知",
+      "push_description": "当金库发生收获事件时接收浏览器通知。",
+      "push_blocked": "推送通知已被阻止，请更新网站权限以启用。",
+      "push_unsupported": "此浏览器不支持推送通知。"
     },
     "security": {
       "title": "安全",
