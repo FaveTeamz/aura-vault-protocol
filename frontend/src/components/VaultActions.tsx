@@ -44,6 +44,7 @@ export default function VaultActions() {
   const [modal, setModal] = useState<Tab | null>(null);
   const [balance, setBalance] = useState("1000");
   const [depositState, setDepositState] = useState<ButtonTxState>("idle");
+  const [isPaused, setIsPaused] = useState(false);
   const [sharePrice, setSharePrice] = useState("1.0");
   const [sharePriceUpdatedAt, setSharePriceUpdatedAt] = useState<
     number | undefined
@@ -118,6 +119,9 @@ export default function VaultActions({ isPaused: isPausedProp }: VaultActionsPro
   }, [externalModal]);
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
     fetch(`${apiUrl}/api/vault/balance_of?address=mock`)
+    fetch(`${apiUrl}/api/vault/status`)
+        if (d?.paused !== undefined) setIsPaused(d.paused);
+        else if (d?.is_paused !== undefined) setIsPaused(d.is_paused);
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
    * Signature matches TransactionModal's onClose prop: (outcome?) => void
@@ -238,6 +242,7 @@ export default function VaultActions({ isPaused: isPausedProp }: VaultActionsPro
           data-cy="open-deposit-modal"
           txState={depositState}
           onClick={handleOpenDeposit}
+          disabled={isPaused || depositState === "pending"}
           className="w-full"
       {/* Pause notice — shown inside the panel in addition to the page-level banner */}
       {paused && (
@@ -247,6 +252,8 @@ export default function VaultActions({ isPaused: isPausedProp }: VaultActionsPro
         >
           Actions are disabled while the vault is paused.
         </p>
+          {isPaused ? "Vault Paused" : "Deposit"}
+        </DepositButton>
       )}
 
           type="button"

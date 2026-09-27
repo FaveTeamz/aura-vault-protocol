@@ -115,3 +115,66 @@ jobs:
           name: aura-vault-wasm-pr-${{ github.event.number }}
           path: aura-vault/target/wasm32-unknown-unknown/release/aura_vault.wasm
           retention-days: 7
+
+  deposit-flow-e2e:
+    name: Deposit Flow E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers (Chrome, Firefox, WebKit)
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Start frontend server
+        working-directory: frontend
+        run: npx next start -p 3000 &
+        env:
+          NODE_ENV: production
+
+      - name: Wait for frontend to be ready
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run Playwright deposit flow tests (Chrome, Firefox, WebKit)
+        run: |
+          npx playwright test playwright/deposit-flow.spec.ts \
+            --project=chromium \
+            --project=firefox \
+            --project=webkit
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          CI: "true"
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-deposit-report-pr-${{ github.event.number }}
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload screenshots on failure
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-failure-screenshots-pr-${{ github.event.number }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
