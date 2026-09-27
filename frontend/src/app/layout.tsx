@@ -10,6 +10,7 @@ import WalletConnect from "@/components/WalletConnect";
 import ProgressBar from "@/components/ProgressBar";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { HeaderWidgets } from "@/components/HeaderWidgets";
+import { ToastProvider } from "@/components/toast";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "Aura Vault Protocol",
@@ -77,6 +78,20 @@ export default function RootLayout({
           {children}
           {/* Issue #284: PWA install prompt */}
           <ServiceWorkerRegistration />
+          <ToastProvider>
+            <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
+              <a href="/" className="text-sm font-semibold tracking-tight">Aura Vault</a>
+              <div className="flex items-center gap-4">
+                <nav className="flex gap-4 text-sm">
+                  <a href="/faq" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">FAQ</a>
+                  <a href="/settings" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Settings</a>
+                </nav>
+                <LanguageSwitcher />
+                <ThemeToggle />
+              </div>
+            </header>
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

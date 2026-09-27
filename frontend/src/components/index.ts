@@ -62,3 +62,11 @@ export { startProgress, doneProgress } from "./ProgressBar";
 export { OnboardingTour, useRestartTour } from "./OnboardingTour";
 export { ExplorerMenu } from "./ExplorerMenu";
 export type { ExplorerMenuProps } from "./ExplorerMenu";
+// Toast notification system (Issue #257)
+  ToastProvider,
+  ToastContainer,
+  useToast,
+  type Toast,
+  type ToastVariant,
+  type ToastOptions,
+} from "./toast";

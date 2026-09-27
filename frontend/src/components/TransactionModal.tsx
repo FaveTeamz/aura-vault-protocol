@@ -21,6 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import PreSignBreakdown from "./PreSignBreakdown";
 import { ExplorerMenu } from "./ExplorerMenu";
+import { useToast } from "./toast";
 
 import {
   useState,
@@ -87,6 +88,8 @@ function Spinner() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TransactionModal({ type, balance, sharePrice = "1.0", sharePriceUpdatedAt: _sharePriceUpdatedAt, onClose }: Props) {
+export default function TransactionModal({ type, balance, onClose }: Props) {
+  const { info, txSuccess, error: toastError } = useToast();
   const [step, setStep] = useState<Step>(1);
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
@@ -274,6 +277,11 @@ export default function TransactionModal({
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(retrying = false) {
     if (!retrying) { setStatus("pending"); setTxError(""); }
+    if (!retrying) {
+      setStatus("pending");
+      setTxError("");
+      // Toast: transaction submitted
+      info(`${label} submitted`, "Waiting for wallet confirmation…");
     try {
       // Attach the referral code (if any) as metadata on deposit transactions.
       // The backend uses this to credit the referrer and register the referral.
@@ -287,24 +295,31 @@ export default function TransactionModal({
 
       const res = await fetch("/api/vault/transactions/submit", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
         body:    JSON.stringify(payload),
-      });
       const data = await res.json();
       if (!res.ok) throw new Error((data as { error?: string }).error ?? "Transaction failed");
       setTxHash((data as { hash?: string }).hash ?? `tx-${Date.now()}`);
       setStatus("success");
       setRetryCount(0);
+      const hash: string = data.hash || `tx-${Date.now()}`;
+      setTxHash(hash);
+      // Toast: transaction confirmed — includes "View on Explorer" link
+      const explorerUrl = `https://stellar.expert/explorer/testnet/tx/${hash}`;
+      txSuccess(`${label} confirmed!`, explorerUrl, `Amount: ${amount} XLM`);
+    } catch (err: unknown) {
+      const errorMsg = (err instanceof Error ? err.message : "Transaction failed") ?? "Transaction failed";
+      setTxError(errorMsg);
+      setStatus("error");
 
       // Clear the stored referral code after a successful deposit so it is
       // not re-used on subsequent transactions.
       if (type === "deposit" && referralCode) {
         clearReferralCode();
       }
-    } catch (err: unknown) {
       setTxError(err instanceof Error ? err.message : "Transaction failed");
-      setStatus("error");
       if (retrying) setRetryCount((c) => c + 1);
+      // Toast: transaction failed — error variant persists until dismissed
+      toastError(`${label} failed`, errorMsg);
     }
   }
 
