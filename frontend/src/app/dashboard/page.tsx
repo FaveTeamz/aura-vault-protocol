@@ -3,6 +3,7 @@
 import { SortableDashboardGrid } from "@/components/dashboard/SortableDashboardGrid";
 import PerformanceCharts from "@/components/PerformanceCharts";
 import ApyCalculator from "@/components/ApyCalculator";
+import dynamic from "next/dynamic";
 
 /**
  * /dashboard — main vault overview page.
@@ -13,13 +14,33 @@ import ApyCalculator from "@/components/ApyCalculator";
  *  - Widget visibility controlled from /settings
  *  - Layout persisted to localStorage
  *  - Smooth 60fps drag animation via CSS transform + DragOverlay
- *
  * Issue #261: APY Calculator added below PerformanceCharts.
+ * Code-split routes with dynamic imports to enforce bundle size budgets.
  */
+const DashboardGrid = dynamic(
+  () => import("@/components/dashboard/DashboardGrid").then((mod) => mod.DashboardGrid),
+  {
+    loading: () => (
+      <div className="h-96 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
+    ),
+    ssr: true,
+  }
+);
+
+const PerformanceCharts = dynamic(
+  () => import("@/components/PerformanceCharts"),
+  {
+    loading: () => (
+      <div className="h-72 w-full animate-pulse rounded-2xl bg-zinc-100 dark:bg-zinc-800" />
+    ),
+    ssr: false, // Charts are client-side canvas visualization
+  }
+);
+
 export default function DashboardPage() {
   return (
     <div className="space-y-8">
-      <SortableDashboardGrid />
+      <DashboardGrid />
       <PerformanceCharts />
 
       {/* APY Calculator — issue #261 */}

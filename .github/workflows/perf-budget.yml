@@ -86,6 +86,15 @@ jobs:
               console.log('Could not parse size-report.json:', e.message);
             }
 
+            let baselineMap = {};
+            try {
+              if (fs.existsSync('frontend/bundle-baseline.json')) {
+                baselineMap = JSON.parse(fs.readFileSync('frontend/bundle-baseline.json', 'utf8'));
+              }
+            } catch (e) {
+              console.log('Could not parse bundle-baseline.json:', e.message);
+            }
+
             const exitCode = '${{ steps.size_check.outputs.exit_code }}';
             const passed = exitCode === '0';
             const statusIcon = passed ? '✅' : '❌';
@@ -94,14 +103,28 @@ jobs:
             let tableRows = '';
             for (const entry of reportJson) {
               const name = entry.name || entry.path;
+              const currentBytes = entry.size || 0;
               const size = entry.size ? (entry.size / 1024).toFixed(1) + ' kB' : '—';
+              const baseBytes = baselineMap[name];
+              let deltaStr = '—';
+              if (baseBytes !== undefined && entry.size) {
+                const diffBytes = currentBytes - baseBytes;
+                const diffKb = (Math.abs(diffBytes) / 1024).toFixed(1);
+                if (diffBytes > 0) {
+                  deltaStr = `🔺 +${diffKb} kB (increased)`;
+                } else if (diffBytes < 0) {
+                  deltaStr = `🟢 -${diffKb} kB (decreased)`;
+                } else {
+                  deltaStr = `0.0 kB (no change)`;
+                }
+              }
               const limit = entry.limit || '—';
               const exceeded = entry.exceeded ? '❌ OVER LIMIT' : '✅';
-              tableRows += `| ${name} | ${size} (gzip) | ${limit} | ${exceeded} |\n`;
+              tableRows += `| ${name} | ${size} (gzip) | ${deltaStr} | ${limit} | ${exceeded} |\n`;
             }
 
             if (!tableRows) {
-              tableRows = '| _(size-limit output unavailable)_ | — | — | — |\n';
+              tableRows = '| _(size-limit output unavailable)_ | — | — | — | — |\n';
             }
 
             const body = [
@@ -110,8 +133,8 @@ jobs:
               `**Status:** ${statusText}`,
               `**Commit:** \`${{ github.sha }}\``,
               '',
-              '| Bundle | Size (gzip) | Limit | Status |',
-              '|---|---|---|---|',
+              '| Bundle | Size (gzip) | Size Delta | Limit | Status |',
+              '|---|---|---|---|---|',
               tableRows,
               '',
               '<details>',
