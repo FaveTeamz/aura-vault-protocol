@@ -58,6 +58,7 @@ import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
 import { referralRouter } from "./routes/referralRoutes.js";
 import { userExportRouter } from "./routes/userExportRoutes.js";
 import { indexerRouter } from "./routes/indexerRoutes.js";
+import { portfolioHistoryRouter } from "./routes/portfolioHistoryRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
 // Issue #263: Admin panel — router + middleware
 import { adminRouter } from "./routes/adminRoutes.js";
@@ -183,6 +184,8 @@ app.use("/api/webhooks", authenticate, webhookRouter);
 app.use("/api/email", emailRouter);
 app.use("/api/notifications/email", notificationRouter);
 app.use("/api/v1/user/portfolio", authenticate, portfolioRouter);
+// Issue #290: Portfolio history — public read; address is in the path param
+app.use("/api/portfolio", portfolioHistoryRouter);
 app.use("/api/v1/gas", gasRouter);
 app.use("/api/v1/yield", yieldRouter);
 app.use("/api/v1/queue", queueRouter);
