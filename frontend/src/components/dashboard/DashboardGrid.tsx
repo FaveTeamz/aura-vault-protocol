@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { HeroCard } from "./HeroCard";
 import { ApyCard, DepositorCountCard, LastHarvestCard } from "./MetricCards";
 import { UserPositionCard, type UserPosition } from "./UserPositionCard";
+import SharePriceChart from "@/components/SharePriceChart";
 
 /* ─────────────────────────────────────────────
    Data shapes
@@ -235,6 +236,11 @@ export function DashboardGrid() {
 
         {/* ⑤ User position — only rendered when wallet connected */}
         <UserPositionCard position={position} isLoading={loading} />
+      </div>
+
+      {/* ⑥ Share Price Chart — spans full width */}
+      <div className="mt-5">
+        <SharePriceChart />
       </div>
     </main>
   );

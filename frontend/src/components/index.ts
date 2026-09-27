@@ -1,4 +1,5 @@
 // Default exports
+export { default as SharePriceChart } from "./SharePriceChart";
 export { default as WalletConnect } from "./WalletConnect";
 export { default as TransactionModal } from "./TransactionModal";
 export { default as PerformanceCharts } from "./PerformanceCharts";
