@@ -29,6 +29,9 @@ export const metadata: Metadata = {
 };
 // Root layout — minimal wrapper required by Next.js App Router.
 // All locale-specific rendering is handled by app/[locale]/layout.tsx.
+// Inline script runs before React hydration to prevent theme flash.
+// Must use the same localStorage key as ThemeProvider: "aura-theme"
+const noFlashScript = `(function(){try{var t=localStorage.getItem('aura-theme');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 export default function RootLayout({
   children,
 }: {
