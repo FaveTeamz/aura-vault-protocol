@@ -140,7 +140,7 @@ body {
   transform: none;
 }
 
-/* ── Skeleton — #99 / #133 shimmer animation ───────────────────────────── */
+/* ── Skeleton — #99 / #992 shimmer animation ───────────────────────────── */
 .skeleton-wrapper {
   display: flex;
   flex-direction: column;
@@ -148,9 +148,16 @@ body {
 }
 
 .skeleton-row {
-  height: 1.25rem; border-radius: var(--radius);
-  background: linear-gradient(90deg, var(--color-surface-raised) 25%, var(--color-surface-overlay) 50%, var(--color-surface-raised) 75%);
-  background-size: 200% 100%; animation: shimmer 1.4s infinite;
+  height: 1.25rem;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
 }
 .skeleton-row--sm { height: 0.875rem; }
 .skeleton-row--lg { height: 1.75rem; }
@@ -167,9 +174,9 @@ body {
   flex-shrink: 0;
   background: linear-gradient(
     90deg,
-    var(--color-surface-raised) 25%,
-    #2e3350 50%,
-    var(--color-surface-raised) 75%
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -258,9 +265,9 @@ body {
   border-radius: var(--radius) var(--radius) 0 0;
   background: linear-gradient(
     90deg,
-    var(--color-surface-raised) 25%,
-    #2e3350 50%,
-    var(--color-surface-raised) 75%
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-shimmer) 50%,
+    var(--color-skeleton-base) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -1268,3 +1275,23 @@ footer {
   justify-content: space-between;
   padding-top: var(--sp-2);
 }
+
+/* ── Skeleton dark / light mode variants — #992 ─────────────────────────── */
+/*
+ * The default token values above target the dark theme (--color-bg: #0f1117).
+ * Override here for a light-mode variant if the project adds one.
+ *
+ * Example:
+ *   @media (prefers-color-scheme: light) {
+ *     :root {
+ *       --color-skeleton-base:    #e8eaed;
+ *       --color-skeleton-shimmer: #f5f5f5;
+ *     }
+ *   }
+ *
+ * Or with a data attribute:
+ *   [data-theme="light"] {
+ *     --color-skeleton-base:    #e8eaed;
+ *     --color-skeleton-shimmer: #f5f5f5;
+ *   }
+ */

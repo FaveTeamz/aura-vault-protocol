@@ -10,6 +10,8 @@
   --color-surface:         #1a1d27;
   --color-surface-raised:  #22263a;
   --color-surface-overlay: #2a2f47;
+  --color-skeleton-base:    var(--color-surface-raised);
+  --color-skeleton-shimmer: #2e3350;
   --color-border:          #ffffff18;
   --color-border-strong:   #ffffff30;
 
