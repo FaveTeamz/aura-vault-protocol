@@ -10,6 +10,8 @@ export interface VaultStatsData {
   total_shares: number;
   apy: number;             // 0–1, e.g. 0.085 = 8.5%
   last_harvest: string | null; // ISO-8601 or null if never harvested
+  /** TVL cap in underlying token units. null when no cap is configured. */
+  tvl_cap: number | null;
 }
 
 /**
@@ -24,6 +26,7 @@ export async function getVaultStats(): Promise<VaultStatsData> {
     total_shares: 0,
     apy: 0,
     last_harvest: null,
+    tvl_cap: null,
   };
 }
 

@@ -18,6 +18,7 @@ import VaultPauseBanner from "./VaultPauseBanner";
 import AdminPauseControls from "./AdminPauseControls";
 import { useVaultPause } from "@/lib/useVaultPause";
 import { PrintPortfolioButton } from "./PrintPortfolioButton";
+import { VaultCapacityBar } from "./VaultCapacityBar";
 interface VaultStats {
   tvl: string;
   apy: string;
@@ -451,7 +452,6 @@ export default function VaultDashboard({
               label="Your Balance"
               value={fmtNumber(stats!.userBalance)}
               rawValue={parseFloat(stats!.userBalance)}
-              decimals={4}
               sub="Underlying tokens"
               testId="price-per-share"
               label="Your Shares"
@@ -495,13 +495,18 @@ export default function VaultDashboard({
             "focus:border-zinc-400 focus:ring-2 focus:ring-zinc-200",
             "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100",
             "dark:placeholder-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-800",
-        />
       {/* ── Wallet and Actions ─────────────────────────────────────────────── */}
       <div className="relative z-0 grid grid-cols-1 gap-6 sm:grid-cols-2">
         <section aria-labelledby="wallet-heading" className="relative z-0">
           <h2
             id="wallet-heading"
             className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500"
+      {/* Vault Capacity Bar — Issue #1005: only visible when tvl_cap is set */}
+      <VaultCapacityBar />
+      {/* Wallet + Actions row */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <section aria-labelledby="wallet-heading">
+          <h2 id="wallet-heading" className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
             Wallet
           </h2>
           <WalletConnect />
