@@ -241,7 +241,7 @@ jobs:
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Create GitHub issue on failure
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const title = `🚨 Backup Restore Test Failed — ${new Date().toISOString().slice(0, 10)}`;
