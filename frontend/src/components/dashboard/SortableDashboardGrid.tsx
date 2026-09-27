@@ -45,6 +45,10 @@ import {
   type WidgetId,
   type WidgetDescriptor,
 } from "@/lib/useWidgetLayout";
+import VaultPauseBanner from "@/components/VaultPauseBanner";
+import AdminPauseControls from "@/components/AdminPauseControls";
+import VaultActions from "@/components/VaultActions";
+import { useVaultPause } from "@/lib/useVaultPause";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -247,10 +251,13 @@ export function SortableDashboardGrid() {
   const [loading, setLoading] = useState(true);
   const [liveMsg, setLiveMsg] = useState("");
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
+  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Derive wallet address from the user position (set when wallet is connected)
   const walletAddress = position?.address || undefined;
+  // Vault pause state — shared down to VaultActions and AdminPauseControls.
+  const { isPaused, refresh: refreshPauseState } = useVaultPause();
 
   // Only render visible widgets
   const visibleWidgets = widgets.filter((w) => w.visible);
@@ -412,6 +419,22 @@ export function SortableDashboardGrid() {
     return () => clearInterval(interval);
   }, [fetchStats]);
 
+  // ── Wallet address detection ─────────────────────────────────────────────────
+  // WalletConnect persists the connected wallet state to localStorage.
+  // We read it so AdminPauseControls can compare against NEXT_PUBLIC_ADMIN_ADDRESS.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("walletState");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { address?: string };
+        if (parsed?.address) setConnectedAddress(parsed.address);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
   // ── Active drag overlay widget ───────────────────────────────────────────────
   const activeWidget = activeId
     ? widgets.find((w) => w.id === activeId)
@@ -432,6 +455,9 @@ export function SortableDashboardGrid() {
       >
         {liveMsg}
       </div>
+
+      {/* Vault pause banner — shown prominently when vault is paused */}
+      <VaultPauseBanner isPaused={isPaused} className="mb-6" />
 
       {/* Page heading */}
       <div className="mb-8">
@@ -524,6 +550,29 @@ export function SortableDashboardGrid() {
           </p>
         </div>
       )}
+
+      {/* Vault action buttons — disabled when vault is paused */}
+      <section
+        aria-labelledby="actions-heading"
+        className="mt-8"
+      >
+        <h2
+          id="actions-heading"
+          className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500"
+        >
+          Actions
+        </h2>
+        <VaultActions isPaused={isPaused} />
+      </section>
+
+      {/* Admin-only pause / unpause control */}
+      <div className="mt-6">
+        <AdminPauseControls
+          isPaused={isPaused}
+          connectedAddress={connectedAddress}
+          onToggle={refreshPauseState}
+        />
+      </div>
     </main>
   );
 }

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WalletConnect from "./WalletConnect";
 import VaultActions from "./VaultActions";
-import { useOnboarding } from "@/components/OnboardingChecklist";
 import { FinancialValue } from "./FinancialValue";
 import { EmptyState } from "./EmptyState";
 import { AnimatedShareBalance } from "./AnimatedShareBalance";
@@ -15,6 +14,9 @@ import {
 import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 import type { DeepLinkAction } from "@/lib/useDeepLink";
 import { ExplorerMenu } from "./ExplorerMenu";
+import VaultPauseBanner from "./VaultPauseBanner";
+import AdminPauseControls from "./AdminPauseControls";
+import { useVaultPause } from "@/lib/useVaultPause";
 interface VaultStats {
   tvl: string;
   apy: string;
@@ -222,6 +224,21 @@ export default function VaultDashboard({
   useEffect(() => {
     markComplete("view_dashboard");
   }, [markComplete]);
+  const [connectedAddress, setConnectedAddress] = useState<string | null>(null);
+  // Vault pause state — single source of truth for the entire dashboard.
+  const { isPaused, refresh: refreshPauseState } = useVaultPause();
+  // Read connected wallet address from localStorage (set by WalletConnect).
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem("walletState");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { address?: string };
+        if (parsed?.address) setConnectedAddress(parsed.address);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
   const fetchStats = useCallback(async () => {
     try {
       const [assetsRes, apyRes] = await Promise.all([
@@ -249,6 +266,7 @@ export default function VaultDashboard({
     }
   }, []);
     fetchStats();
+    void fetchStats();
   }, [fetchStats]);
     const wsUrl =
       typeof window !== "undefined"
@@ -264,6 +282,11 @@ export default function VaultDashboard({
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data as string);
+          const msg = JSON.parse(evt.data as string) as {
+            type: string;
+            tvl?: string;
+            apy?: string;
+          };
           if (msg.type === "vault_update") {
             setStats((prev) =>
               prev
@@ -369,6 +392,8 @@ export default function VaultDashboard({
           <span>Shortcuts</span>
         </button>
       {/* ── Portfolio ──────────────────────────────────────────────────────── */}
+      {/* Vault pause banner — full-width at the top of the dashboard */}
+      <VaultPauseBanner isPaused={isPaused} />
       {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -491,6 +516,13 @@ export default function VaultDashboard({
       {/* Transactions */}
         aria-labelledby="tx-heading"
         className="relative z-50"
+          {/* Pass pause state down so VaultActions doesn't poll separately */}
+          <VaultActions isPaused={isPaused} />
+      {/* Admin-only pause / unpause control */}
+      <AdminPauseControls
+        isPaused={isPaused}
+        connectedAddress={connectedAddress}
+        onToggle={refreshPauseState}
         <div className="relative z-0 mb-3 flex items-center justify-between">
             id="tx-heading"
             className="text-sm font-semibold uppercase tracking-wide text-zinc-500"
@@ -498,7 +530,7 @@ export default function VaultDashboard({
           <button
             data-testid="refresh-btn"
             type="button"
-            onClick={fetchStats}
+            onClick={() => void fetchStats()}
             className="relative z-20 touch-manipulation text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             ↻ Refresh
           </button>

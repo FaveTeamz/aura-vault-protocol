@@ -12,6 +12,8 @@ export { default as PageTransition } from "./PageTransition";
 export { HarvestButton } from "./HarvestButton";
 export { default as ProgressBar } from "./ProgressBar";
 export { default as ApyCalculator } from "./ApyCalculator";
+export { default as VaultPauseBanner } from "./VaultPauseBanner";
+export { default as AdminPauseControls } from "./AdminPauseControls";
 
 // Named exports
 export { ThemeToggle } from "./ThemeToggle";

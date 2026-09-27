@@ -18,15 +18,12 @@
  *   pre-filled amount. After the modal closes the caller's `onDeepLinkHandled`
  *   callback fires so the parent can strip the query params from the URL.
  */
-
 import { useState, useEffect, useRef } from "react";
 import TransactionModal from "./TransactionModal";
 import DepositButton, { type ButtonTxState } from "./DepositButton";
 import { useOnboarding } from "@/components/OnboardingChecklist";
 import type { DeepLinkAction } from "@/lib/useDeepLink";
-
 type Tab = "deposit" | "withdraw";
-
 interface VaultActionsProps {
   /**
    * When set by a parent (e.g. via keyboard shortcut), immediately opens
@@ -69,6 +66,36 @@ interface Props {
   const [sharePriceUpdatedAt, setSPUpdatedAt]       = useState<number | undefined>(undefined);
   const deepLinkFired = useRef(false);
   const { markComplete } = useOnboarding();
+ * VaultActions
+ * Deposit / Withdraw / Harvest action panel.
+ * Pause integration: all action buttons are disabled when the vault is paused.
+ * The component accepts an optional `isPaused` prop so the parent can pass down
+ * the shared pause state (avoiding duplicate polls). If the prop is omitted the
+ * component falls back to its own `useVaultPause` call.
+import { useState, useEffect, useCallback } from "react";
+import { useVaultPause } from "@/lib/useVaultPause";
+export interface VaultActionsProps {
+   * Optional: pass the vault pause state from a parent that already calls
+   * `useVaultPause`, so the hook is not duplicated. When omitted the component
+   * manages its own pause state.
+  isPaused?: boolean | undefined;
+export default function VaultActions({ isPaused: isPausedProp }: VaultActionsProps = {}) {
+  // Use the passed-in value when available, otherwise poll independently.
+  const { isPaused: isPausedLocal } = useVaultPause();
+  const isPaused = isPausedProp !== undefined ? isPausedProp : isPausedLocal;
+  const paused = isPaused === true;
+  const fetchBalance = useCallback(async () => {
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${apiBase}/api/vault/balance_of?address=mock`);
+      if (res.ok) {
+        const d = await res.json() as { balance?: string };
+        if (d?.balance) setBalance(d.balance);
+      }
+    } catch {
+      // Ignore — keep the existing balance
+    }
+  }, []);
 
   // Fetch live balance
   useEffect(() => {
@@ -76,10 +103,8 @@ interface Props {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
       .then((d: { balance?: string } | null) => {
-        if (d?.balance) setBalance(d.balance);
       })
       .catch(() => {});
-  }, []);
   // Sync the internal modal state when the parent requests an open.
     if (externalModal) {
       if (externalModal === "deposit") {
@@ -87,9 +112,7 @@ interface Props {
         setDepositState("pending");
       } else {
         setTab("withdraw");
-      }
       setModal(externalModal);
-    }
   }, [externalModal]);
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
@@ -109,7 +132,6 @@ interface Props {
     setModal(initialAction);
   }, [initialAction]);
   // ── Handlers ──────────────────────────────────────────────────────────────
-
     if (type === "deposit") {
       markComplete("make_first_deposit");
       if (outcome === "success") {
@@ -117,34 +139,49 @@ interface Props {
         setTimeout(() => setDepositState("idle"), 2000);
       } else if (outcome === "error") {
         setDepositState("error");
-        setTimeout(() => setDepositState("idle"), 2000);
-      } else {
         // Dismissed without completing
         setDepositState("idle");
-      }
-    }
-
     // Issue #262: notify parent to strip query params from the canonical URL.
     // Only fires once — when the deep-link-triggered modal is closed.
     if (deepLinkFired.current) {
       onDeepLinkHandled?.();
       // Reset so subsequent manual opens don't retrigger the callback
       deepLinkFired.current = false;
-    }
+    void fetchBalance();
+  }, [fetchBalance]);
+  function handleModalClose() {
   }
 
-  function handleOpenDeposit() {
-    setDepositState("pending");
-    setModal("deposit");
-  }
+  // ── Disabled-button helper ─────────────────────────────────────────────
+  // When paused: cursor-not-allowed, reduced opacity, aria-disabled.
+
+  const pausedClasses =
+    "opacity-50 cursor-not-allowed pointer-events-none";
+
+  const actionButtonBase =
+    "w-full rounded-lg py-2.5 text-sm font-semibold transition-colors";
+
+  const primaryButtonClasses = [
+    actionButtonBase,
+    "bg-zinc-900 text-white hover:bg-zinc-700",
+    "dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300",
+    paused ? pausedClasses : "",
+  ]
+    .join(" ")
+    .trim();
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <section className="w-full rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+    <section
+      className="w-full rounded-xl border border-zinc-200 p-4 dark:border-zinc-700"
+      aria-label="Vault actions"
+    >
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4" role="tablist" aria-label="Action type">
         <button
+          role="tab"
+          aria-selected={tab === "deposit"}
           data-cy="deposit-tab"
           onClick={() => setTab("deposit")}
           className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
@@ -156,6 +193,8 @@ interface Props {
           Deposit
         </button>
         <button
+          role="tab"
+          aria-selected={tab === "withdraw"}
           data-cy="withdraw-tab"
           onClick={() => setTab("withdraw")}
           className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
@@ -185,17 +224,30 @@ interface Props {
           txState={depositState}
           onClick={handleOpenDeposit}
           className="w-full"
+      {/* Pause notice — shown inside the panel in addition to the page-level banner */}
+      {paused && (
+        <p
+          className="mb-3 text-xs font-medium text-red-600 dark:text-red-400"
+          aria-live="polite"
         >
-          Deposit
-        </DepositButton>
+          Actions are disabled while the vault is paused.
+        </p>
       )}
 
+          type="button"
+          disabled={paused}
+          aria-disabled={paused}
+          onClick={() => !paused && setModal("deposit")}
+          className={primaryButtonClasses}
       {/* Withdraw tab */}
       {tab === "withdraw" && (
         <button
           data-cy="open-withdraw-modal"
-          onClick={() => setModal("withdraw")}
-          className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-semibold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+          type="button"
+          disabled={paused}
+          aria-disabled={paused}
+          onClick={() => !paused && setModal("withdraw")}
+          className={primaryButtonClasses}
         >
           Withdraw
         </button>
@@ -211,6 +263,28 @@ interface Props {
           initialAmount={modal === initialAction ? (initialAmount ?? undefined) : undefined}
           onClose={(outcome) => handleModalClose(modal, outcome)}
           onClose={() => handleModalClose(modal)}
+      {/* Harvest — always visible in case the user switches tabs */}
+      <button
+        data-cy="open-harvest-modal"
+        type="button"
+        disabled={paused}
+        aria-disabled={paused}
+        onClick={() => !paused && setModal(null /* harvest handled separately */)}
+        className={[
+          actionButtonBase,
+          "mt-2 border border-zinc-300 hover:bg-zinc-50",
+          "dark:border-zinc-600 dark:hover:bg-zinc-800",
+          paused ? pausedClasses : "",
+        ]
+          .join(" ")
+          .trim()}
+      >
+        Harvest
+      </button>
+      {/* Modal */}
+      {modal && !paused && (
+          sharePrice="1.0"
+          onClose={handleModalClose}
         />
       )}
     </section>
