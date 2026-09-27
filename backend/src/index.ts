@@ -43,6 +43,9 @@ import { startVaultSyncJob, stopVaultSyncJob } from "./services/vaultRegistrySer
 import { userPreferencesRouter } from "./routes/userPreferencesRoutes.js";
 import { leaderboardRouter } from "./routes/leaderboardRoutes.js";
 import { swaggerRouter } from "./routes/swaggerRoutes.js";
+// Issue #263: Admin panel — router + middleware
+import { adminRouter } from "./routes/adminRoutes.js";
+import { authenticateAdmin } from "./middleware/adminMiddleware.js";
 import {
   applySecurityHeaders,
   applyCors,
