@@ -31,6 +31,13 @@ import { queueRouter } from "./routes/queueRoutes.js";
 import { startWorker, stopWorker } from "./queue.js";
 import { analyticsRouter } from "./routes/analyticsRoutes.js";
 import { apyRouter } from "./routes/apyRoutes.js";
+// Issue #285: Contract event stream (SSE)
+import { eventsRouter } from "./routes/eventsRoutes.js";
+// Issue #286: Stellar wallet JWT authentication
+import { stellarAuthRouter } from "./routes/stellarAuthRoutes.js";
+// Issue #288: BullMQ vault transaction queue
+import { vaultQueueRouter } from "./routes/vaultQueueRoutes.js";
+import { initVaultQueue, stopVaultQueue } from "./vaultQueue.js";
 import { warmCache } from "./services/defi.js";
 import {
   startAnalyticsCacheWarmer,
@@ -214,6 +221,15 @@ app.use("/api/referrals", referralRouter);
 // Issue #868: OpenAPI 3.1 Spec and Swagger UI at /api/docs
 app.use("/api/docs", swaggerRouter);
 
+// ── Issue #285: Contract event stream (SSE) ───────────────────────────────────
+app.use("/api/v1/events", eventsRouter);
+
+// ── Issue #286: Stellar wallet challenge/verify JWT authentication ────────────
+app.use("/api/auth", stellarAuthRouter);
+
+// ── Issue #288: BullMQ vault transaction queue endpoints ──────────────────────
+app.use("/api/vault", authenticate, vaultQueueRouter);
+
 app.get("/api/health", async (_req, res) => {
   const redisHealthy = await pingRedis();
   const warmup = getWarmupStatus();
@@ -283,6 +299,17 @@ const server = app.listen(PORT, () => {
   startAnalyticsCacheWarmer();
   void warmCache();           // existing DeFi price warm-up
   void runCacheWarmup();      // issue #325: vault stats / share price / top depositors
+
+  // Issue #288: Initialise BullMQ and mount bull-board admin UI
+  try {
+    const bullBoardAdapter = initVaultQueue();
+    // Mount admin UI — protected by authenticate middleware
+    app.use("/admin/queues", authenticate, bullBoardAdapter.getRouter());
+    logger.info("[startup] Bull Board mounted at /admin/queues");
+  } catch (err) {
+    logger.warn({ err }, "[startup] BullMQ init failed — vault queue unavailable");
+  }
+
   logger.info({ port: PORT }, `Aura Vault backend running on port ${PORT}`);
 });
 
@@ -296,6 +323,7 @@ async function shutdown(signal: string): Promise<void> {
   await stopHarvestRepeatableJob(); // issue #944
   await stopAlertEvaluationJob();  // issue #946
   stopAnalyticsCacheWarmer();
+  await stopVaultQueue(); // Issue #288: graceful BullMQ shutdown
   await shutdownTracing();
   server.close(async () => {
     await disconnectRedis().catch((err) => {
