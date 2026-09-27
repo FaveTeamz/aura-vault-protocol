@@ -22,6 +22,8 @@ const STORAGE_KEY = "aura_wallet_state";
 const LAST_WALLET_KEY = "aura_last_wallet";
 export function truncate(address: string): string {
   if (!address || address.length <= 10) return address || "";
+};
+function truncate(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 /**
  * Supported wallet definitions with metadata and install instructions
@@ -196,6 +198,43 @@ export default function WalletConnect({
       markComplete?.("connect_wallet");
       setIsModalOpen(false);
       onConnected?.();
+      if (type === "metamask") {
+        const win = window as Window & {
+          ethereum?: {
+            request: (args: {
+              method: string;
+            }) => Promise<string[]>;
+          };
+        };
+        if (!win.ethereum) {
+          throw new Error("MetaMask is not installed.");
+        const accounts = await win.ethereum.request({
+          method: "eth_requestAccounts",
+        });
+        if (!accounts.length) {
+          throw new Error("No MetaMask account was returned.");
+        setWallet({
+          type,
+          address: accounts[0],
+        onConnected?.();
+        return;
+      if (type === "freighter") {
+          freighterApi?: {
+            requestAccess?: () => Promise<{
+              address?: string;
+            }>;
+            getPublicKey?: () => Promise<string>;
+        if (!win.freighterApi) {
+          throw new Error("Freighter is not installed.");
+        let address: string | undefined;
+        if (win.freighterApi.requestAccess) {
+          const result = await win.freighterApi.requestAccess();
+          address = result.address;
+        if (!address && win.freighterApi.getPublicKey) {
+          address = await win.freighterApi.getPublicKey();
+        if (!address) {
+          throw new Error("No Freighter address was returned.");
+          address,
     } catch (err: unknown) {
       const msg =
         err instanceof Error
@@ -280,6 +319,23 @@ export default function WalletConnect() {
       setConnected(addrResult.address, networkName ?? "TESTNET");
       const msg = err instanceof Error ? err.message : "Failed to connect wallet";
       setError(msg);
+      const accounts = (await ethereum.request({
+        method: "eth_requestAccounts",
+      })) as string[];
+      const chainId = (await ethereum.request({
+        method: "eth_chainId",
+      })) as string;
+      const networkName = chainId === "0x1" ? "ETHEREUM" : "TESTNET";
+      const state: WalletState = {
+        type: "metamask",
+        address: accounts[0],
+      setWallet(state);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(LAST_WALLET_KEY, "metamask");
+      markComplete("connect_wallet");
+      setShowDropdown(false);
+      setError(
+          : "Failed to connect to MetaMask"
     } finally {
       setLoading(false);
       setConnectingId(null);
@@ -300,6 +356,19 @@ export default function WalletConnect() {
       isInstalled: installedMap[id] ?? false,
     })
   // If connected, render connected state
+  }, [markComplete]);
+  const connectCoinbase = useCallback(async () => {
+      const { CoinbaseWalletSDK } = await import(
+        "@coinbase/wallet-sdk"
+      const coinbaseWallet = new CoinbaseWalletSDK({
+        appName: "Aura Vault Protocol",
+        appLogoUrl: "/logo.png",
+      });
+      const provider = coinbaseWallet.makeWeb3Provider();
+      const accounts = (await provider.request({
+        type: "metamask", // Coinbase uses MetaMask-compatible provider
+      localStorage.setItem(LAST_WALLET_KEY, "coinbase");
+          : "Failed to connect to Coinbase Wallet"
   if (wallet) {
     const meta = SUPPORTED_WALLETS_METADATA[wallet.type];
     return (

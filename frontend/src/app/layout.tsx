@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -6,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 // Issue #284: PWA service worker registration
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import WalletConnect from "@/components/WalletConnect";
+import ProgressBar from "@/components/ProgressBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,6 +39,11 @@ export const metadata: Metadata = {
 
       <body className="min-h-full flex flex-col bg-white text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100">
         <ThemeProvider>
+          {/* Slim progress bar for page transitions and API calls (#266) */}
+          <Suspense fallback={null}>
+            <ProgressBar />
+          </Suspense>
+
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
             <a href="/" className="text-sm font-semibold tracking-tight">
               Aura Vault

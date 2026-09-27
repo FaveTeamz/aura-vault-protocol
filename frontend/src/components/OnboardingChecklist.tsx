@@ -2,52 +2,38 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle, Circle, X, ChevronDown, ChevronUp } from "lucide-react";
-
 // ─── Types ───────────────────────────────────────────────────────────────────
-
 export type ChecklistItemId =
   | "connect_wallet"
   | "view_dashboard"
   | "make_first_deposit"
   | "earn_first_yield";
-
 interface ChecklistItem {
   id: ChecklistItemId;
   label: string;
   description: string;
 }
-
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: "connect_wallet",
     label: "Connect Wallet",
     description: "Link your Stellar wallet to get started.",
   },
-  {
     id: "view_dashboard",
     label: "View Dashboard",
     description: "Explore your vault position and stats.",
-  },
-  {
     id: "make_first_deposit",
     label: "Make First Deposit",
     description: "Deposit tokens to receive vault shares.",
-  },
-  {
     id: "earn_first_yield",
     label: "Earn First Yield",
     description: "Let your shares accrue yield over time.",
-  },
 ];
-
 // ─── Storage helpers ─────────────────────────────────────────────────────────
-
 function storageKey(walletAddress: string | null): string {
   return walletAddress
     ? `aura_onboarding_${walletAddress}`
     : "aura_onboarding_anonymous";
-}
-
 function loadProgress(walletAddress: string | null): Set<ChecklistItemId> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -58,63 +44,36 @@ function loadProgress(walletAddress: string | null): Set<ChecklistItemId> {
   } catch {
     return new Set();
   }
-}
-
 function saveProgress(
   walletAddress: string | null,
   completed: Set<ChecklistItemId>
 ): void {
-  try {
     localStorage.setItem(
       storageKey(walletAddress),
       JSON.stringify(Array.from(completed))
     );
-  } catch {
     // localStorage not available (SSR / private browsing)
-  }
-}
-
 function loadDismissed(walletAddress: string | null): boolean {
   if (typeof window === "undefined") return false;
-  try {
     return localStorage.getItem(`${storageKey(walletAddress)}_dismissed`) === "true";
-  } catch {
     return false;
-  }
-}
-
 function saveDismissed(walletAddress: string | null): void {
-  try {
     localStorage.setItem(`${storageKey(walletAddress)}_dismissed`, "true");
-  } catch {
     // noop
-  }
-}
-
 // ─── Context / hook ──────────────────────────────────────────────────────────
-
 import { createContext, useContext, type ReactNode } from "react";
-
 interface OnboardingContextValue {
   markComplete: (id: ChecklistItemId) => void;
-}
-
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
-
 export function useOnboarding(): OnboardingContextValue {
   const ctx = useContext(OnboardingContext);
   if (!ctx) throw new Error("useOnboarding must be used within OnboardingChecklist");
   return ctx;
-}
-
 // ─── Component ───────────────────────────────────────────────────────────────
-
 interface OnboardingChecklistProps {
   /** Current wallet address; used to namespace localStorage key. */
   walletAddress?: string | null;
   children?: ReactNode;
-}
-
 export function OnboardingChecklist({
   walletAddress = null,
   children,
@@ -123,14 +82,12 @@ export function OnboardingChecklist({
   const [dismissed, setDismissed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
-
   // Hydrate from localStorage after mount (SSR-safe)
   useEffect(() => {
     setCompleted(loadProgress(walletAddress));
     setDismissed(loadDismissed(walletAddress));
     setMounted(true);
   }, [walletAddress]);
-
   const markComplete = useCallback(
     (id: ChecklistItemId) => {
       setCompleted((prev) => {
@@ -143,30 +100,40 @@ export function OnboardingChecklist({
     },
     [walletAddress]
   );
-
   const handleDismiss = useCallback(() => {
     setDismissed(true);
     saveDismissed(walletAddress);
-  }, [walletAddress]);
-
   const completedCount = completed.size;
   const totalCount = CHECKLIST_ITEMS.length;
   const allDone = completedCount === totalCount;
   const progressPct = Math.round((completedCount / totalCount) * 100);
-
   // Hide if dismissed or not yet mounted (avoids hydration flash)
   if (!mounted || dismissed) {
     return (
       <OnboardingContext.Provider value={{ markComplete }}>
         {children}
       </OnboardingContext.Provider>
-    );
-  }
+import { createContext, useContext, useCallback } from "react";
+type MilestoneId = string;
+  markComplete: (id: MilestoneId) => void;
+const OnboardingContext = createContext<OnboardingContextValue>({
+  markComplete: () => {},
+});
+  return useContext(OnboardingContext);
+export function OnboardingProvider({ children }: { children: React.ReactNode }) {
+  const markComplete = useCallback((id: MilestoneId) => {
+    // Persist milestone completion to localStorage
+    try {
+      const key = `aura_onboarding_${id}`;
+      localStorage.setItem(key, "true");
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   return (
     <OnboardingContext.Provider value={{ markComplete }}>
       {children}
-
       {/* Floating checklist card */}
       <div
         role="complementary"
@@ -182,7 +149,6 @@ export function OnboardingChecklist({
             </span>
             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
               {completedCount}/{totalCount}
-            </span>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -202,9 +168,7 @@ export function OnboardingChecklist({
                 <X size={16} />
               </button>
             )}
-          </div>
         </div>
-
         {/* Progress bar */}
         <div className="px-4 pt-3">
           <div
@@ -219,10 +183,7 @@ export function OnboardingChecklist({
               className="h-full rounded-full bg-indigo-500 transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
-          </div>
           <p className="mt-1 text-right text-xs text-zinc-400">{progressPct}% complete</p>
-        </div>
-
         {/* Items */}
         {!collapsed && (
           <ul className="divide-y divide-zinc-50 px-2 pb-3 dark:divide-zinc-800" role="list">
@@ -268,15 +229,12 @@ export function OnboardingChecklist({
             })}
           </ul>
         )}
-
         {/* All done banner */}
         {allDone && !collapsed && (
           <div className="mx-4 mb-4 rounded-xl bg-emerald-50 px-3 py-2.5 dark:bg-emerald-950/40">
             <p className="text-center text-sm font-semibold text-emerald-700 dark:text-emerald-400">
               🎉 You're all set! Dismiss when ready.
             </p>
-          </div>
-        )}
       </div>
     </OnboardingContext.Provider>
   );

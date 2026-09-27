@@ -378,15 +378,22 @@ export default function VaultDashboard() {
               testId="total-assets"
               label="TVL"
               value={fmtNumber(stats!.tvl)}
+              rawValue={parseFloat(stats!.tvl)}
+              decimals={4}
               sub="Total Value Locked"
             />
               testId="apy"
               label="APY"
               value={`${fmtNumber(stats!.apy)}%`}
+              rawValue={parseFloat(stats!.apy)}
+              decimals={2}
+              suffix="%"
               sub="Annualized yield"
               testId="share-balance"
               label="Your Balance"
               value={fmtNumber(stats!.userBalance)}
+              rawValue={parseFloat(stats!.userBalance)}
+              decimals={4}
               sub="Underlying tokens"
               testId="price-per-share"
               label="Your Shares"
@@ -436,6 +443,10 @@ export default function VaultDashboard() {
             onExternalModalClose={() => setShortcutModal(null)}
       {/* ── Transactions ───────────────────────────────────────────────────── */}
       <section aria-labelledby="tx-heading" className="relative z-50">
+          <VaultActions />
+      {/* Transactions */}
+        aria-labelledby="tx-heading"
+        className="relative z-50"
         <div className="relative z-0 mb-3 flex items-center justify-between">
             id="tx-heading"
             className="text-sm font-semibold uppercase tracking-wide text-zinc-500"

@@ -54,9 +54,7 @@ export default function VaultActions({
       })
       .catch(() => {});
   }, []);
-
   // Sync the internal modal state when the parent requests an open.
-  useEffect(() => {
     if (externalModal) {
       if (externalModal === "deposit") {
         setTab("deposit");
@@ -67,7 +65,6 @@ export default function VaultActions({
       setModal(externalModal);
     }
   }, [externalModal]);
-
   /**
    * Called when TransactionModal closes.
    * Accepts an optional outcome so we can animate the button.
@@ -166,6 +163,7 @@ export default function VaultActions({
           sharePrice={sharePrice}
           sharePriceUpdatedAt={sharePriceUpdatedAt}
           onClose={(outcome) => handleModalClose(modal, outcome)}
+          onClose={() => handleModalClose(modal)}
         />
       )}
     </section>

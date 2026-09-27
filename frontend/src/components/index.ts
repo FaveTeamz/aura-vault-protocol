@@ -9,6 +9,7 @@ export { default as FAQPage } from "./FAQPage";
 export { default as LazyImage } from "./LazyImage";
 export { default as PageTransition } from "./PageTransition";
 export { HarvestButton } from "./HarvestButton";
+export { default as ProgressBar } from "./ProgressBar";
 
 // Named exports
 export { ThemeToggle } from "./ThemeToggle";
@@ -51,6 +52,6 @@ export {
   type NotificationType,
   type Notification,
 } from "./notifications";
-
 // Keyboard shortcuts (#269)
 export { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
+export { startProgress, doneProgress } from "./ProgressBar";
