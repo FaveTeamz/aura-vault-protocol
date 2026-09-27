@@ -2,6 +2,7 @@ import { useState, lazy, Suspense } from "react";
 import { Toast } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ContractErrorBoundary } from "./components/ContractErrorBoundary";
+import { SWRErrorBoundary } from "./components/SWRErrorBoundary";
 import { OnboardingFlow, hasCompletedOnboarding } from "./components/OnboardingFlow";
 import { EmptyState } from "./components/EmptyState";
 import { Skeleton } from "./components/Skeleton";
@@ -43,25 +44,31 @@ export default function App() {
    * After a successful deposit the parent would update this value.
    */
   const [shareBalance] = useState<number>(0);
-
   // In a real app this would come from a wallet-connection context/hook.
   // Kept as undefined here so the boundary still works without a connected wallet.
   const walletAddress: string | undefined = undefined;
+  // In a real app, the connected wallet address comes from a wallet adapter
+  // (e.g. Freighter, xBull). Stub to null until the user connects.
+  const [walletAddress] = useState<string | null>(null);
 
   const notify = (msg: ToastMessage) => setToast(msg);
 
   const handleFirstDeposit = () => setTab("deposit");
 
   return (
-    <ErrorBoundary>
-      <div className="app">
-        <a href="#main" className="skip-link">
-          Skip to main content
-        </a>
+    // SWRErrorBoundary wraps the entire app as the global SWR provider.
+    // It catches any uncaught SWR fetch errors and renders a recovery UI.
+    <SWRErrorBoundary>
+      {/* Existing ErrorBoundary handles non-SWR render errors. */}
+      <ErrorBoundary>
+        <div className="app">
+          <a href="#main" className="skip-link">
+            Skip to main content
+          </a>
 
-        <header className="app-header" role="banner">
-          <h1>Aura Vault</h1>
-        </header>
+          <header className="app-header" role="banner">
+            <h1>Aura Vault</h1>
+          </header>
 
         <main id="main" className="app-main">
           {/* Show empty state for new users with zero share balance */}
@@ -107,11 +114,16 @@ export default function App() {
         </main>
 
         {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
-
         {showOnboarding && (
           <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
         )}
       </div>
     </ErrorBoundary>
+          {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
+          {showOnboarding && (
+            <OnboardingFlow onComplete={() => setShowOnboarding(false)} />
+        </div>
+      </ErrorBoundary>
+    </SWRErrorBoundary>
   );
 }

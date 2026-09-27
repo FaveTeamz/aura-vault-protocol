@@ -7,9 +7,11 @@ import { useInlineLiveRegion } from "./LiveRegion";
 
 interface Props {
   onToast: (msg: ToastMessage) => void;
+  /** Connected wallet address — null when no wallet is connected. */
+  walletAddress: string | null;
 }
 
-export function WithdrawForm({ onToast }: Props) {
+export function WithdrawForm({ onToast, walletAddress }: Props) {
   const id = useId();
   const [shares, setShares] = useState("");
   const [fieldError, setFieldError] = useState("");
@@ -18,8 +20,12 @@ export function WithdrawForm({ onToast }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { announce, regionProps } = useInlineLiveRegion("polite");
 
+  // useUserPosition is keyed by wallet address; null address is a no-op.
+  const { data: position, revalidate } = useUserPosition(walletAddress);
+
   const validate = (val: string) => {
-    if (!val || isNaN(Number(val)) || Number(val) <= 0) return "Enter a valid share amount greater than 0.";
+    if (!val || isNaN(Number(val)) || Number(val) <= 0)
+      return "Enter a valid share amount greater than 0.";
     return "";
   };
 

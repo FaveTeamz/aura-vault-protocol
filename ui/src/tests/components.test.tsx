@@ -301,6 +301,8 @@ describe("Skeleton", () => {
 // App — tab navigation
 // ---------------------------------------------------------------------------
 describe("App tab navigation", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
   it("renders all three tab buttons", () => {
     render(<App />);
     expect(screen.getByRole("tab", { name: /deposit/i })).toBeInTheDocument();
@@ -334,7 +336,7 @@ describe("App tab navigation", () => {
     render(<App />);
     await userEvent.click(screen.getByRole("tab", { name: /withdraw/i }));
     await userEvent.click(screen.getByRole("tab", { name: /deposit/i }));
-    expect(screen.getByRole("heading", { name: /deposit/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /deposit/i })).toBeInTheDocument();
   });
 
   it("withdraw tab sets aria-selected=true when active", async () => {
