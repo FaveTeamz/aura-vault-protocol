@@ -11,7 +11,6 @@ import ProgressBar from "@/components/ProgressBar";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { HeaderWidgets } from "@/components/HeaderWidgets";
 import "./globals.css";
-
 export const metadata: Metadata = {
   title: "Aura Vault Protocol",
   description:
@@ -25,10 +24,11 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
   },
 };
-
+// Root layout — minimal wrapper required by Next.js App Router.
+// All locale-specific rendering is handled by app/[locale]/layout.tsx.
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
 }>) {
   return (
@@ -46,7 +46,6 @@ export default function RootLayout({
           </Suspense>
           {/* Onboarding tour — auto-starts on first visit, restartable from Settings */}
           <OnboardingTour />
-
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
             <a href="/" className="text-sm font-semibold tracking-tight">
               Aura Vault
@@ -70,17 +69,11 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-4 shrink-0">
                   className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-                >
                   Settings
-                </a>
               </nav>
-
               <LanguageSwitcher />
               <ThemeToggle />
-            </div>
           </header>
-
           {children}
           {/* Issue #284: PWA install prompt */}
           <ServiceWorkerRegistration />
@@ -88,4 +81,6 @@ export default function RootLayout({
       </body>
     </html>
   );
+}) {
+  return children;
 }

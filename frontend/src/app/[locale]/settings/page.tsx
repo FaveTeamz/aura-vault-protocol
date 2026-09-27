@@ -6,11 +6,12 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORTED_LANGS } from "@/lib/i18n";
 import AddressBook from "@/components/AddressBook";
 import "@/lib/i18n";
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type Currency = "USD" | "EUR" | "BTC";
 export type LanguageCode = "en" | "es" | "fr" | "de" | "zh" | "ar";
 const TOUR_STORAGE_KEY = "aura_tour_completed";
+import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 interface Settings {
   // Display preferences
@@ -92,6 +93,7 @@ function getPushPermissionState(): "granted" | "denied" | "default" | "unsupport
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
+  const t = useTranslations("settings");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
   const [showDeactivate, setShowDeactivate] = useState(false);
@@ -173,6 +175,7 @@ export default function SettingsPage() {
             {t("settings.reset_defaults")}
           </button>
         </div>
+        <h1 className="text-2xl font-semibold mb-8">{t("heading")}</h1>
 
         {/* Saved confirmation */}
         {saved && (
@@ -180,11 +183,9 @@ export default function SettingsPage() {
             role="status"
             aria-live="polite"
             className="mb-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400"
-          >
             {t("settings.saved")}
           </div>
         )}
-
         {/* ── Appearance ───────────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-appearance">
           <h2 id="section-appearance" className="text-lg font-medium mb-3">
@@ -195,18 +196,13 @@ export default function SettingsPage() {
               {t("settings.appearance.description")}
             </p>
             <ThemeToggle />
-          </div>
         </section>
-
         {/* ── Language ─────────────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-language">
           <h2 id="section-language" className="text-lg font-medium mb-3">
             {t("settings.language.title")}
-          </h2>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
               {t("settings.language.description")}
-            </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {SUPPORTED_LANGS.map(({ code, label, flag }) => (
                 <button
@@ -224,48 +220,27 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-          </div>
-        </section>
-
         {/* ── Currency Display ─────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-currency">
           <h2 id="section-currency" className="text-lg font-medium mb-3">
             {t("settings.currency.title")}
-          </h2>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
               {t("settings.currency.description")}
-            </p>
             <div className="flex flex-wrap gap-2">
               {CURRENCY_OPTIONS.map(({ value, label, symbol }) => (
-                <button
                   key={value}
                   onClick={() => handleCurrencyChange(value)}
                   aria-pressed={settings.currency === value}
                   className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
                     settings.currency === value
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 hover:border-indigo-400"
-                  }`}
-                >
                   <span className="font-mono text-base" aria-hidden="true">{symbol}</span>
                   {value} — {label}
-                </button>
-              ))}
-            </div>
             <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
               {t("settings.currency.note")}
-            </p>
-          </div>
-        </section>
-
         {/* ── Notifications ─────────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-notifications">
           <h2 id="section-notifications" className="text-lg font-medium mb-3">
             {t("settings.notifications.title")}
-          </h2>
           <div className="space-y-3 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
-
             {/* Standard notification toggles */}
             {(
               [
@@ -285,24 +260,20 @@ export default function SettingsPage() {
                 />
               </label>
             ))}
-
             {/* Email field (shown when emailNotifications is on) */}
             {settings.emailNotifications && (
               <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
                 <label htmlFor="settings-email" className="text-xs text-zinc-500 block mb-1">
                   {t("settings.notifications.email_address")}
                 </label>
-                <input
                   id="settings-email"
                   type="email"
                   value={settings.email}
                   onChange={(e) => update("email", e.target.value)}
                   placeholder={t("settings.notifications.email_placeholder")}
                   className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
               </div>
             )}
-
             {/* Browser push notifications for harvest events */}
             <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
               <label className="flex items-start justify-between cursor-pointer gap-3">
@@ -312,7 +283,6 @@ export default function SettingsPage() {
                   </span>
                   <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 block">
                     {t("settings.notifications.push_description")}
-                  </span>
                   {pushPermission === "denied" && (
                     <span className="text-xs text-amber-600 dark:text-amber-400 mt-1 block">
                       {t("settings.notifications.push_blocked")}
@@ -321,30 +291,25 @@ export default function SettingsPage() {
                   {pushPermission === "unsupported" && (
                     <span className="text-xs text-zinc-400 mt-1 block">
                       {t("settings.notifications.push_unsupported")}
-                    </span>
-                  )}
                 </div>
-                <input
-                  type="checkbox"
                   checked={settings.pushNotifications}
                   disabled={pushPermission === "denied" || pushPermission === "unsupported"}
                   onChange={(e) => void handlePushToggle(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40"
-                />
-              </label>
-            </div>
-          </div>
-        </section>
-
         {/* ── Wallet ───────────────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-wallet">
           <h2 id="section-wallet" className="text-lg font-medium mb-3">
             {t("settings.wallet.title")}
-          </h2>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
             <p className="text-sm text-zinc-500">{t("settings.wallet.no_wallet")}</p>
             <button className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
               {t("settings.wallet.connect")}
+          <div role="status" className="mb-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400">
+            {t("saved")}
+        {/* Wallet Info */}
+        <section className="mb-8">
+          <h2 className="text-lg font-medium mb-3">{t("wallet.heading")}</h2>
+            <p className="text-sm text-zinc-500">{t("wallet.noWallet")}</p>
+              {t("wallet.connect")}
             </button>
           </div>
         </section>
@@ -353,9 +318,12 @@ export default function SettingsPage() {
         <section className="mb-8" aria-labelledby="section-slippage">
           <h2 id="section-slippage" className="text-lg font-medium mb-3">
             {t("settings.slippage.title")}
-          </h2>
           <div className="flex flex-wrap gap-2">
             {SLIPPAGE_OPTIONS.map((val) => (
+        {/* Slippage */}
+          <h2 className="text-lg font-medium mb-3">{t("slippage.heading")}</h2>
+          <div className="flex gap-2">
+            {slippageOptions.map((val) => (
               <button
                 key={val}
                 onClick={() => update("slippageTolerance", val)}
@@ -373,20 +341,32 @@ export default function SettingsPage() {
           {settings.slippageTolerance >= 3 && (
             <p className="mt-2 text-xs text-amber-600" role="alert">
               {t("settings.slippage.high_warning")}
-            </p>
           )}
-        </section>
-
         {/* ── Security ─────────────────────────────────────────────────────── */}
         <section className="mb-8" aria-labelledby="section-security">
           <h2 id="section-security" className="text-lg font-medium mb-3">
             {t("settings.security.title")}
-          </h2>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900">
             <label className="flex items-center justify-between cursor-pointer">
               <div>
                 <span className="text-sm font-medium">{t("settings.security.two_factor")}</span>
                 <p className="text-xs text-zinc-500 mt-0.5">{t("settings.security.two_factor_desc")}</p>
+            <p className="mt-2 text-xs text-amber-600">{t("slippage.highWarning")}</p>
+        {/* Notifications */}
+          <h2 className="text-lg font-medium mb-3">{t("notifications.heading")}</h2>
+            {([
+              ["notifyDeposits", t("notifications.deposits")] as const,
+              ["notifyWithdrawals", t("notifications.withdrawals")] as const,
+              ["notifyVaultEvents", t("notifications.vaultEvents")] as const,
+              ["emailNotifications", t("notifications.email")] as const,
+            ]).map(([key, label]) => (
+                  onChange={(e) => update(key, e.target.checked)}
+                <label className="text-xs text-zinc-500 block mb-1">
+                  {t("notifications.emailAddress")}
+                  placeholder={t("notifications.emailPlaceholder")}
+        {/* Security */}
+          <h2 className="text-lg font-medium mb-3">{t("security.heading")}</h2>
+                <span className="text-sm font-medium">{t("security.twoFactor")}</span>
+                <p className="text-xs text-zinc-500 mt-0.5">{t("security.twoFactorDescription")}</p>
               </div>
               <input
                 type="checkbox"
@@ -421,18 +401,21 @@ export default function SettingsPage() {
           <div className="rounded-xl border border-red-200 dark:border-red-900/30 p-4 bg-red-50 dark:bg-red-950/20">
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
               {t("settings.danger.description")}
+          <h2 className="text-lg font-medium mb-3 text-red-600">{t("danger.heading")}</h2>
+              {t("danger.description")}
             </p>
             <button
               onClick={() => setShowDeactivate(true)}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
             >
               {t("settings.danger.deactivate")}
-            </button>
             {showDeactivate && (
               <div className="mt-3 p-3 rounded-lg border border-red-300 dark:border-red-800 bg-white dark:bg-zinc-900">
                 <p className="text-sm text-red-600 font-medium mb-2">
                   {t("settings.danger.confirm_message")}
                 </p>
+              {t("danger.deactivate")}
+                <p className="text-sm text-red-600 font-medium mb-2">{t("danger.confirmPrompt")}</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowDeactivate(false)}
@@ -442,6 +425,8 @@ export default function SettingsPage() {
                   </button>
                   <button className="rounded-lg bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700">
                     {t("settings.danger.confirm")}
+                    {t("danger.cancel")}
+                    {t("danger.confirm")}
                   </button>
                 </div>
               </div>

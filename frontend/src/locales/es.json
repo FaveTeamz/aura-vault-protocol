@@ -11,7 +11,6 @@
     "learning_center": "Centro de aprendizaje",
     "deploy_now": "Desplegar ahora",
     "documentation": "Documentación"
-  },
   "faq": {
     "title": "Preguntas Frecuentes",
     "subtitle": "Todo lo que necesitas saber sobre Aura Vault Protocol.",
@@ -20,7 +19,6 @@
     "no_results": "No se encontraron resultados.",
     "cant_find": "¿No encuentras tu respuesta?",
     "open_issue": "Abre un issue en GitHub"
-  },
   "settings": {
     "title": "Configuración",
     "saved": "Configuración guardada",
@@ -32,21 +30,17 @@
     "language": {
       "title": "Idioma",
       "description": "Elige tu idioma preferido. Los cambios se aplican de inmediato."
-    },
     "currency": {
       "title": "Moneda",
       "description": "Elige cómo se muestran los saldos y el rendimiento.",
       "note": "Los precios se obtienen de feeds de mercado y son solo informativos."
-    },
     "wallet": {
       "title": "Billetera Conectada",
       "no_wallet": "Sin billetera conectada",
       "connect": "Conectar Billetera"
-    },
     "slippage": {
       "title": "Tolerancia de Deslizamiento",
       "high_warning": "Un deslizamiento alto puede resultar en operaciones desfavorables"
-    },
     "notifications": {
       "title": "Notificaciones",
       "deposits": "Confirmaciones de depósito",
@@ -59,12 +53,10 @@
       "push_description": "Recibe una notificación cuando ocurra un evento de cosecha en el vault.",
       "push_blocked": "Las notificaciones push están bloqueadas. Actualiza los permisos del sitio.",
       "push_unsupported": "Las notificaciones push no son compatibles con este navegador."
-    },
     "security": {
       "title": "Seguridad",
       "two_factor": "Autenticación de Dos Factores",
       "two_factor_desc": "Añade una capa adicional de seguridad"
-    },
     "danger": {
       "title": "Zona de Peligro",
       "description": "Desactivar tu cuenta eliminará todos los datos y no se puede deshacer.",
@@ -73,7 +65,6 @@
       "cancel": "Cancelar",
       "confirm": "Confirmar Desactivación"
     }
-  },
   "notifications": {
     "title": "Notificaciones",
     "mark_all_read": "Marcar todo como leído",
@@ -81,12 +72,10 @@
     "empty": "Sin notificaciones",
     "unread_aria": "Notificaciones, {{count}} sin leer",
     "dismiss": "Descartar notificación"
-  },
   "theme": {
     "light": "Claro",
     "dark": "Oscuro",
     "auto": "Auto"
-  },
   "vault_errors": {
     "1":  { "title": "Vault No Inicializado",        "message": "El vault aún no ha sido inicializado. Contacta al administrador o verifica la dirección del contrato." },
     "2":  { "title": "Ya Inicializado",              "message": "El vault ya ha sido inicializado y no puede configurarse nuevamente." },
@@ -112,5 +101,49 @@
     "22": { "title": "Desvinculación Pendiente",     "message": "Tu retiro aún está en el período de desvinculación. Por favor espera e inténtalo después del tiempo de desbloqueo." },
     "23": { "title": "Tarifa de Retiro Inválida",    "message": "La tarifa de retiro excede la tasa máxima permitida del 5%. Usa un valor entre 0 y 500 puntos básicos." },
     "24": { "title": "Interruptor de Circuito Activado", "message": "Cosecha rechazada: el movimiento del precio de participación excedió el límite de seguridad. El vault ha sido pausado automáticamente pendiente de revisión del administrador." }
+  "meta": {
+    "title": "Aura Vault Protocol",
+    "description": "Una bóveda de rendimiento basada en acciones sobre Soroban para el ecosistema Stellar."
+    "heading": "Para comenzar, edita el archivo page.tsx.",
+    "body": "¿Buscas un punto de partida o más instrucciones? Visita {templatesLink} o el {learningLink}.",
+    "learning": "Centro de aprendizaje",
+    "faqLink": "FAQ",
+    "deployNow": "Desplegar ahora"
+    "faq": "FAQ",
+    "heading": "Notificaciones",
+    "markAllRead": "Marcar todas como leídas",
+    "clear": "Limpiar",
+    "unreadAriaLabel": "Notificaciones, {count} sin leer",
+    "readAriaLabel": "Notificaciones",
+    "dismissAriaLabel": "Cerrar notificación",
+    "timestamp": "{date}"
+    "heading": "Configuración",
+      "heading": "Billetera conectada",
+      "noWallet": "Sin billetera conectada",
+      "connect": "Conectar billetera"
+      "heading": "Tolerancia de deslizamiento",
+      "highWarning": "Un deslizamiento alto puede resultar en operaciones desfavorables"
+      "heading": "Notificaciones",
+      "vaultEvents": "Alertas de rendimiento de la bóveda",
+      "emailAddress": "Dirección de correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.com"
+      "heading": "Seguridad",
+      "twoFactor": "Autenticación de dos factores",
+      "twoFactorDescription": "Agrega una capa extra de seguridad"
+      "heading": "Zona de peligro",
+      "deactivate": "Desactivar cuenta",
+      "confirmPrompt": "¿Estás seguro? Esta acción es irreversible.",
+      "confirm": "Confirmar desactivación"
+    "heading": "Preguntas frecuentes",
+    "subheading": "Todo lo que necesitas saber sobre Aura Vault Protocol.",
+    "searchPlaceholder": "Buscar preguntas\u2026",
+    "allCategory": "Todas",
+    "noResults": "No se encontraron resultados.",
+    "cantFind": "¿No encuentras tu respuesta?",
+    "openIssue": "Abre un issue en GitHub"
+  "languageSwitcher": {
+    "label": "Idioma",
+    "en": "English",
+    "es": "Español"
   }
 }
