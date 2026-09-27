@@ -7,7 +7,6 @@
  *   - Mobile (< sm):  full-screen bottom sheet, slides up from bottom,
  *                     swipe-down gesture to dismiss
  *   - Desktop (≥ sm): centred modal overlay (existing behaviour)
- *
  * Accessibility:
  *   - All interactive targets ≥ 44 × 44 px (WCAG 2.5.5)
  *   - amount input uses inputmode="decimal" → numeric keyboard on mobile
@@ -15,11 +14,12 @@
  *   - Escape key closes on desktop; swipe-down closes on mobile
  *   - Focus trapped inside the sheet/modal while open
  *   - Body scroll locked while open
- *   - Body scroll locked while open
- *
  * No horizontal overflow at 375 px viewport.
  */
 import { getStoredReferralCode, clearReferralCode } from "@/lib/referral";
+import { useState, useEffect, useRef } from "react";
+import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import PreSignBreakdown from "./PreSignBreakdown";
 
 import {
   useState,
@@ -45,15 +45,17 @@ interface Props {
   sharePriceUpdatedAt?: number;
   onClose:            (outcome?: "success" | "error") => void;
 }
-
 interface GasEstimate {
   baseFee:     string;
   priorityFee: string;
   totalGas:    string;
-}
-
 // ─── Small helpers ────────────────────────────────────────────────────────────
-
+  type: TxType;
+  balance: string;
+  /** Current share price (XLM per share) used in the pre-sign breakdown. */
+  sharePrice?: string;
+  /** Timestamp (epoch ms) when sharePrice was last updated. */
+  onClose: () => void;
 function Spinner() {
   return (
     <svg
@@ -77,6 +79,15 @@ function Spinner() {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+export default function TransactionModal({ type, balance, sharePrice = "1.0", sharePriceUpdatedAt: _sharePriceUpdatedAt, onClose }: Props) {
+  const [step, setStep] = useState<Step>(1);
+  const [amount, setAmount] = useState("");
+  const [amountError, setAmountError] = useState("");
+  const [status, setStatus] = useState<TxStatus>("idle");
+  const [txHash, setTxHash] = useState("");
+  const [txError, setTxError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
 export default function TransactionModal({
   type,
@@ -202,14 +213,11 @@ export default function TransactionModal({
         baseFee:     data.baseFee     ?? "0.001",
         priorityFee: data.priorityFee ?? "0.0005",
         totalGas:    data.totalGas    ?? "0.0015",
-      });
     } catch {
       setGasEstimate({ baseFee: "0.001", priorityFee: "0.0005", totalGas: "0.0015" });
     } finally {
       setGasLoading(false);
-    }
   }
-
   // ── Validation ────────────────────────────────────────────────────────────
   function validateAmount(): boolean {
     const n = parseFloat(amount);
@@ -228,7 +236,6 @@ export default function TransactionModal({
   // ── Step navigation ───────────────────────────────────────────────────────
   async function handleNext() {
     if (step === 1 && validateAmount()) {
-      await estimateGas(amount);
       setStep(2);
     } else if (step === 2) {
       setStep(3);
@@ -455,7 +462,6 @@ export default function TransactionModal({
                   </button>
                 ))}
               </div>
-
               {amountError && (
                 <p
                   id="amount-error"
@@ -467,7 +473,6 @@ export default function TransactionModal({
                   {amountError}
                 </p>
               )}
-
               <button
                 data-cy="modal-next-btn"
                 type="button"
@@ -478,7 +483,6 @@ export default function TransactionModal({
               </button>
             </div>
           )}
-
           {/* ──────────── Step 2: Review ──────────── */}
           {step === 2 && (
             <div data-cy="modal-step-2" className="flex flex-col gap-4">
@@ -489,7 +493,6 @@ export default function TransactionModal({
                     {amount}
                   </dd>
                 </div>
-
                 {gasLoading ? (
                   <div className="flex justify-between text-sm">
                     <dt className="text-zinc-500">Est. Gas</dt>
@@ -506,21 +509,15 @@ export default function TransactionModal({
                         {gasEstimate?.baseFee ?? "0.001"} XLM
                       </dd>
                     </div>
-                    <div className="flex justify-between text-sm">
                       <dt className="text-zinc-500">Priority Fee</dt>
                       <dd data-cy="modal-priority-fee" className="font-mono">
                         {gasEstimate?.priorityFee ?? "0.0005"} XLM
-                      </dd>
-                    </div>
                     <div className="flex justify-between border-t border-zinc-200 pt-3 text-sm font-semibold dark:border-zinc-700">
                       <dt className="text-zinc-600 dark:text-zinc-300">Total Gas</dt>
                       <dd data-cy="modal-gas-estimate" className="font-mono">
                         {gasEstimate?.totalGas ?? "0.0015"} XLM
-                      </dd>
-                    </div>
                   </>
                 )}
-
                 <div className="flex justify-between border-t border-zinc-200 pt-3 text-base font-bold dark:border-zinc-700">
                   <dt className="text-zinc-900 dark:text-zinc-100">Total (with gas)</dt>
                   <dd
@@ -530,44 +527,26 @@ export default function TransactionModal({
                         ? "text-red-600 dark:text-red-400"
                         : "text-emerald-600 dark:text-emerald-400"
                     }`}
-                  >
                     {totalWithGas.toFixed(4)}
-                  </dd>
-                </div>
               </dl>
-
               {totalWithGas > balanceNum && (
                 <p className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-                  <AlertCircle size={16} aria-hidden="true" />
                   Insufficient balance for gas fees
-                </p>
-              )}
-
               <div className="flex gap-3">
                 <button
                   data-cy="modal-back-btn"
                   type="button"
                   onClick={() => setStep(1)}
                   className={btnSecondary}
-                >
                   Back
                 </button>
-                <button
                   data-cy="modal-next-btn"
-                  type="button"
                   onClick={() => void handleNext()}
                   disabled={totalWithGas > balanceNum || gasLoading}
                   className={btnPrimary}
-                >
                   Confirm
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* ──────────── Step 3: Signing / Result ──────────── */}
           {step === 3 && (
-            <div
               data-cy="modal-step-3"
               className="flex flex-col items-center gap-5 py-4 text-center"
             >
@@ -575,16 +554,11 @@ export default function TransactionModal({
                 <>
                   <Spinner />
                   <p className="text-sm text-zinc-500">Confirming in wallet…</p>
-                  <button
                     data-cy="modal-confirm-btn"
                     disabled
                     className={`${btnPrimary} opacity-50 cursor-not-allowed`}
-                  >
                     Waiting…
-                  </button>
                 </>
-              )}
-
               {status === "success" && (
                 <div data-cy="modal-success" className="flex flex-col items-center gap-4 w-full">
                   <CheckCircle
@@ -600,7 +574,53 @@ export default function TransactionModal({
                     <span data-cy="modal-tx-hash" className="font-mono">
                       {txHash.slice(0, 16)}…
                     </span>
-                  </p>
+        {/* Step 2: Pre-sign Breakdown */}
+        {step === 2 && (
+          <div data-cy="modal-step-2">
+            <PreSignBreakdown
+              type={type}
+              amount={amount}
+              sharePrice={sharePrice}
+              onCancel={() => setStep(1)}
+              onProceed={handleNext}
+          </div>
+        )}
+        {/* Step 3: Signing / Result */}
+        {step === 3 && (
+          <div
+            data-cy="modal-step-3"
+            className="flex flex-col items-center gap-4 py-4 text-center"
+            {status === "pending" && (
+              <>
+                <Spinner />
+                <p className="text-sm text-zinc-500">Confirming in wallet…</p>
+                  data-cy="modal-confirm-btn"
+                  disabled
+                  className="rounded-lg bg-zinc-200 px-4 py-2.5 font-semibold text-zinc-400 dark:bg-zinc-700 dark:text-zinc-500"
+                  Waiting…
+              </>
+            )}
+            {status === "success" && (
+              <div data-cy="modal-success" className="flex flex-col items-center gap-3">
+                <CheckCircle size={48} className="text-green-600 dark:text-green-400" />
+                <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+                  {label} successful!
+                <p className="text-xs text-zinc-500">
+                  Tx:{" "}
+                  <span
+                    data-cy="modal-tx-hash"
+                    className="font-mono"
+                    {txHash.slice(0, 16)}…
+                  </span>
+                  onClick={onClose}
+                  className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black"
+                  Done
+            {status === "error" && (
+              <div data-cy="modal-error" className="flex flex-col items-center gap-3">
+                <XCircle size={48} className="text-red-600 dark:text-red-400" />
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {txError || "Transaction failed"}
+                {retryCount < 3 && (
                   <button
                     type="button"
                     onClick={() => triggerClose("success")}

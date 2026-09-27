@@ -19,6 +19,7 @@ import { vaultRouter } from './vaultRoutes.js';
 import { userPreferencesRouter } from './userPreferencesRoutes.js';
 import { analyticsRouter } from './analyticsRoutes.js';
 import { alertsRouter } from './alertRoutes.js';
+import { stellarRouter } from './stellarRoutes.js';
 
 export const v1Router = Router();
 
@@ -35,3 +36,4 @@ v1Router.use('/users/preferences', authenticate, userPreferencesRouter);
 v1Router.use('/analytics', analyticsRouter);
 // Issue #946: Alert subscription CRUD — auth applied inside the router
 v1Router.use('/alerts', alertsRouter);
+v1Router.use('/stellar', stellarRouter);
