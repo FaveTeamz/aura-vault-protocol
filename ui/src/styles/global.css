@@ -856,3 +856,415 @@ nav {
 footer {
   display: block;
 }
+
+/* ── TransactionTable ───────────────────────────────────────────────────────
+   Includes: section chrome, toolbar, table, badges, hash links,
+   pagination controls, error state, empty state, skeleton overrides.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Section wrapper */
+.tx-table-section {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+/* Header row — title + optional wallet label */
+.tx-table-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.tx-table-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tx-table-wallet {
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  background: var(--color-surface-raised);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius);
+}
+
+/* ── Toolbar ────────────────────────────────────────────────────────────────── */
+.tx-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.tx-toolbar__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.tx-toolbar__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.tx-toolbar__select {
+  min-width: 10rem;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 0.9rem;
+  /* reset browser arrow then provide custom one */
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239fa8c7' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+  cursor: pointer;
+}
+
+/* ── Table wrapper — horizontal scroll on small viewports ─────────────────── */
+.tx-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-surface-raised);
+  /* keyboard-scrollable region */
+  outline: none;
+}
+.tx-table-wrapper:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* ── Table base ─────────────────────────────────────────────────────────────── */
+.tx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+/* Header row */
+.tx-th {
+  padding: var(--sp-3) var(--sp-4);
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-surface-raised);
+  white-space: nowrap;
+  background: var(--color-bg);
+}
+
+.tx-th--right {
+  text-align: right;
+}
+
+/* Sortable header */
+.tx-th--sortable {
+  padding: 0;
+}
+
+.tx-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  white-space: nowrap;
+  width: 100%;
+  transition: color var(--transition-fast);
+}
+
+.tx-sort-btn:hover {
+  color: var(--color-text);
+}
+
+.tx-sort-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tx-sort-icon {
+  font-size: 0.9em;
+  color: var(--color-primary);
+}
+
+/* Body rows */
+.tx-row {
+  border-bottom: 1px solid var(--color-surface-raised);
+  transition: background var(--transition-fast);
+}
+
+.tx-row:last-child {
+  border-bottom: none;
+}
+
+.tx-row:hover {
+  background: var(--color-surface-raised);
+}
+
+.tx-td {
+  padding: var(--sp-3) var(--sp-4);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.tx-td--date {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.tx-td--num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.tx-td--hash {
+  font-size: 0.85rem;
+}
+
+.tx-td--muted {
+  color: var(--color-text-muted);
+}
+
+/* ── Type badges ────────────────────────────────────────────────────────────── */
+.tx-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--sp-2);
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.tx-badge--deposit {
+  background: #1b3a2d;
+  color: var(--color-success);
+  border: 1px solid #4caf8440;
+}
+
+.tx-badge--withdraw {
+  background: #3a1b1b;
+  color: var(--color-error);
+  border: 1px solid #f28b8240;
+}
+
+.tx-badge--harvest {
+  background: #1b2e3a;
+  color: var(--color-info);
+  border: 1px solid #81d4fa40;
+}
+
+/* ── Tx Hash link ────────────────────────────────────────────────────────────── */
+.tx-hash-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.tx-hash-link:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tx-hash-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 2px;
+}
+
+.tx-hash-code {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-style: normal;
+}
+
+.tx-hash-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ── Pagination footer ───────────────────────────────────────────────────────── */
+.tx-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding-top: var(--sp-2);
+}
+
+.tx-pagination__summary {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.tx-pagination__summary strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.tx-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.tx-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--color-surface-raised);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tx-page-btn:hover:not(:disabled) {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.tx-page-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tx-page-btn--active {
+  background: var(--color-primary);
+  color: #000;
+  border-color: var(--color-primary);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.tx-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────────── */
+.tx-table-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: #3a1b1b;
+  border-left: 3px solid var(--color-error);
+  border-radius: var(--radius);
+}
+
+.tx-table-error__msg {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+.tx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--sp-4);
+  padding: var(--sp-8) var(--sp-4);
+}
+
+.tx-empty__illustration {
+  width: 120px;
+  height: 120px;
+  opacity: 0.85;
+}
+
+.tx-empty__headline {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tx-empty__body {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+.tx-empty__action {
+  margin-top: var(--sp-2);
+}
+
+/* ── TransactionTableSkeleton overrides ──────────────────────────────────────── */
+.tx-table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.tx-table-skeleton__toolbar {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.tx-table-skeleton__head {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 2.5fr;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--color-surface-raised);
+}
+
+.tx-table-skeleton__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 2.5fr;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--color-surface-raised);
+}
+
+.tx-table-skeleton__row:last-of-type {
+  border-bottom: none;
+}
+
+.tx-table-skeleton__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--sp-2);
+}
