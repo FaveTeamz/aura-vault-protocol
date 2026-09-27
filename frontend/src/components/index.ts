@@ -58,3 +58,5 @@ export {
 export { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 export { startProgress, doneProgress } from "./ProgressBar";
 export { OnboardingTour, useRestartTour } from "./OnboardingTour";
+export { ExplorerMenu } from "./ExplorerMenu";
+export type { ExplorerMenuProps } from "./ExplorerMenu";

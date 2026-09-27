@@ -20,6 +20,7 @@ import { getStoredReferralCode, clearReferralCode } from "@/lib/referral";
 import { useState, useEffect, useRef } from "react";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import PreSignBreakdown from "./PreSignBreakdown";
+import { ExplorerMenu } from "./ExplorerMenu";
 
 import {
   useState,
@@ -652,11 +653,14 @@ export default function TransactionModal({
                   {label} successful!
                 <p className="text-xs text-zinc-500">
                   Tx:{" "}
-                  <span
+                  <ExplorerMenu
                     data-cy="modal-tx-hash"
                     className="font-mono"
                     {txHash.slice(0, 16)}…
                   </span>
+                    value={txHash}
+                    type="tx"
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400"
                   onClick={onClose}
                   className="mt-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black"
                   Done

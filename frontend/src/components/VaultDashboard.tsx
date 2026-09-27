@@ -14,6 +14,7 @@ import {
 } from "@/lib/useKeyboardShortcuts";
 import { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 import type { DeepLinkAction } from "@/lib/useDeepLink";
+import { ExplorerMenu } from "./ExplorerMenu";
 interface VaultStats {
   tvl: string;
   apy: string;
@@ -169,6 +170,10 @@ function StatCard({ label, value, icon, sub, tooltip }: StatCardProps) {
       {sub && (
         <p className="text-xs text-zinc-400 dark:text-zinc-500">{sub}</p>
       )}
+        <ExplorerMenu
+          value={tx.hash}
+          type="tx"
+        />
     </div>
   );
 }
@@ -273,6 +278,7 @@ export default function VaultDashboard({
             setTimeout(() => {
               setLiveMsg("");
             }, 3000);
+            setTimeout(() => setLiveMsg(""), 3000);
           }
         } catch {
           // Ignore malformed WebSocket messages.
@@ -321,6 +327,8 @@ export default function VaultDashboard({
     return number.toLocaleString(undefined, {
       maximumFractionDigits: 4,
     });
+    if (Number.isNaN(number)) return value;
+    return number.toLocaleString(undefined, { maximumFractionDigits: 4 });
     <main className="relative z-0 mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8">
       {/* ── Screen-reader live region ──────────────────────────────────────── */}
       <div
@@ -361,6 +369,14 @@ export default function VaultDashboard({
           <span>Shortcuts</span>
         </button>
       {/* ── Portfolio ──────────────────────────────────────────────────────── */}
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Vault Dashboard
+        </h1>
+        <p className="text-sm text-zinc-500">
+          Real-time overview of your Aura vault positions.
+      {/* Portfolio */}
       <section
         data-testid="portfolio-section"
         aria-label="Portfolio"
@@ -407,6 +423,23 @@ export default function VaultDashboard({
               label="Your Shares"
               value={fmtNumber(stats!.userShares)}
               sub={`@ ${stats!.pricePerShare} / share`}
+            <div
+              data-testid="price-per-share"
+              className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900"
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Your Shares
+              </span>
+              <AnimatedShareBalance
+                value={fmtNumber(stats!.userShares)}
+                className="font-mono text-2xl font-semibold text-zinc-900 dark:text-zinc-50"
+              <span className="text-xs text-zinc-400">
+                <AnimatedShareBalance
+                  value={stats!.pricePerShare}
+                  className="font-mono"
+                  priceMode
+                />
+                {" / share"}
+            </div>
         {!loading && (
           <p className="mt-3 text-sm text-zinc-500">
             Price per share: {stats!.pricePerShare}

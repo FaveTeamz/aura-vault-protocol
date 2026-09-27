@@ -3,6 +3,7 @@
 import React from "react";
 import { DashboardCard } from "./DashboardCard";
 import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
+import { ExplorerMenu } from "@/components/ExplorerMenu";
 
 export interface UserPosition {
   /** Underlying token balance redeemable by this user */
@@ -61,7 +62,15 @@ export function UserPositionCard({ position, isLoading }: UserPositionCardProps)
     <DashboardCard
       variant="default"
       title="Your Position"
-      subtitle={position?.address}
+      subtitle={
+        position?.address ? (
+          <ExplorerMenu
+            value={position.address}
+            type="account"
+            className="text-[length:var(--text-sm)] text-[var(--color-text-muted)]"
+          />
+        ) : undefined
+      }
       data-testid="user-position-card"
       className="col-span-2"
     >
