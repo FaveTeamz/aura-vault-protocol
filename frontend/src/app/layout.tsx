@@ -5,7 +5,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 // Issue #284: PWA service worker registration
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
-
+import WalletConnect from "@/components/WalletConnect";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,7 +41,6 @@ export const metadata: Metadata = {
             <a href="/" className="text-sm font-semibold tracking-tight">
               Aura Vault
             </a>
-
             <div className="flex items-center gap-4">
               <nav className="flex gap-4 text-sm">
                 <a
@@ -50,10 +49,15 @@ export const metadata: Metadata = {
                 >
                   FAQ
                 </a>
-
-                <a
                   href="/settings"
-                  className="text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          <header className="flex items-center justify-between gap-4 px-6 py-3 border-b border-zinc-200 dark:border-zinc-800">
+            <a href="/" className="text-sm font-semibold tracking-tight shrink-0">
+            {/* Wallet connection — occupies the center/right of the header */}
+            <div className="flex-1 max-w-sm">
+              <WalletConnect />
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+                  className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
                 >
                   Settings
                 </a>

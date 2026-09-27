@@ -13,6 +13,7 @@
     "@coinbase/wallet-sdk": "^4.0.2",
     "@creit-tech/stellar-wallets-kit": "npm:@creit.tech/stellar-wallets-kit@^2.7.0",
     "@creit.tech/stellar-wallets-kit": "^2.7.0",
+    "@stellar/freighter-api": "6.0.1",
     "@stellar/stellar-sdk": "^16.0.1",
     "chart.js": "^4.4.0",
     "class-variance-authority": "^0.7.1",
@@ -25,7 +26,9 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "19.2.4",
     "react-i18next": "^15.5.1",
-    "tailwind-merge": "^3.6.0"
+    "swr": "2.3.3",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "5.0.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
