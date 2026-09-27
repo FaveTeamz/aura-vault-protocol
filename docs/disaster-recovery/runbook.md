@@ -508,3 +508,141 @@ Actual RTO: [X hours Y minutes]
 Actual RPO: [X minutes of data loss]
 Post-mortem scheduled: [date/time]
 ```
+
+---
+
+## Secondary Region Restore Procedure (us-west-2)
+
+> Added by Issue #961 — cross-region S3 replication is now active for all
+> objects under the `postgres-backups/` prefix. The replica bucket in
+> `us-west-2` mirrors the primary with ≤ 15-minute replication lag (RTC
+> enabled) and is protected by an independent CMK (`alias/aura-vault-backup-replica-<env>`).
+
+### When to use this procedure
+
+Use this procedure when:
+- The `us-east-1` region is completely unavailable and a backup object must be
+  retrieved directly from the replica
+- An S3 restore is needed as part of a full secondary-region failover
+
+### Prerequisites
+
+```bash
+# 1. Confirm replica objects are present and up-to-date
+aws s3 ls s3://aura-vault-db-backups-replica-prod/postgres-backups/ \
+  --region us-west-2 \
+  --recursive --human-readable | sort | tail -5
+
+# 2. Note the most recent backup file path (e.g.):
+#   2026-09-27 02:03:41  42.3 MiB postgres-backups/aura_vault_20260927_020341.sql.gz.enc
+```
+
+### Step 1 — Verify replication lag
+
+Check that the replica is not stale before relying on it:
+
+```bash
+# Query CloudWatch for the ReplicationLatency metric
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/S3 \
+  --metric-name ReplicationLatency \
+  --dimensions Name=SourceBucket,Value=aura-vault-db-backups-prod \
+               Name=DestinationBucket,Value=aura-vault-db-backups-replica-prod \
+               Name=RuleId,Value=replicate-backups-to-us-west-2 \
+  --start-time "$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --period 1800 \
+  --statistics Maximum \
+  --region us-east-1
+
+# Acceptable: MaximumReplicationLatency < 3600 seconds (1 hour)
+# If lag > 1 hour the Prometheus/CloudWatch alert should already have fired.
+```
+
+### Step 2 — Retrieve backup from replica bucket
+
+```bash
+# Set the replica bucket and region
+REPLICA_BUCKET="aura-vault-db-backups-replica-prod"
+REPLICA_REGION="us-west-2"
+
+# Identify the latest backup
+LATEST=$(aws s3 ls "s3://${REPLICA_BUCKET}/postgres-backups/" \
+  --region "${REPLICA_REGION}" \
+  --recursive | sort | tail -1 | awk '{print $4}')
+
+echo "Latest replica backup: ${LATEST}"
+
+# Download — S3 will transparently decrypt using the replica KMS key
+aws s3 cp "s3://${REPLICA_BUCKET}/${LATEST}" \
+  ./backup-restore-$(date +%Y%m%d).sql.gz.enc \
+  --region "${REPLICA_REGION}"
+```
+
+### Step 3 — Decrypt and restore
+
+The backup format is identical to the primary region: AES-256-CBC (PBKDF2,
+600k iterations). Use the same `BACKUP_ENCRYPTION_KEY` stored in Secrets
+Manager under the `/aura-vault/backup/encryption-key` path.
+
+```bash
+# Retrieve decryption passphrase from Secrets Manager
+ENCRYPTION_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id "/aura-vault/backup/encryption-key" \
+  --region us-east-1 \
+  --query 'SecretString' \
+  --output text)
+
+# Decrypt
+ENCRYPTED_FILE="backup-restore-$(date +%Y%m%d).sql.gz.enc"
+DECRYPTED_FILE="backup-restore-$(date +%Y%m%d).sql.gz"
+
+openssl enc -aes-256-cbc -d -pbkdf2 -iter 600000 \
+  -in  "${ENCRYPTED_FILE}" \
+  -out "${DECRYPTED_FILE}" \
+  -pass "pass:${ENCRYPTION_KEY}"
+
+# Decompress
+gunzip "${DECRYPTED_FILE}"
+SQL_FILE="backup-restore-$(date +%Y%m%d).sql"
+echo "Decrypted dump ready: ${SQL_FILE} ($(du -sh ${SQL_FILE} | cut -f1))"
+
+# Restore to a fresh PostgreSQL instance in us-west-2
+psql -h "<new-rds-endpoint-us-west-2>" \
+     -U aura \
+     -d aura_vault \
+     -f "${SQL_FILE}"
+```
+
+### Step 4 — Update application configuration
+
+Once the database is live in `us-west-2`, update the `DATABASE_URL` secret in
+Secrets Manager (us-west-2) and roll out the backend pods against the new
+endpoint. If running a full region failover:
+
+```bash
+# Switch Route 53 to the secondary ALB (pre-provisioned in us-west-2)
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z0XXXXXXXXXXXXXXXXX \
+  --change-batch file://dns-failover-us-west-2.json
+
+# Validate
+curl -sf https://api.aura-vault.xyz/api/health
+```
+
+### Step 5 — Post-restore validation
+
+Follow the [Post-Recovery Validation Checklist](#post-recovery-validation-checklist)
+with these additional checks specific to the secondary region:
+
+- [ ] `aws s3 ls s3://aura-vault-db-backups-replica-prod/` shows recent objects
+- [ ] Replication lag CloudWatch metric is within SLA (< 1 hour)
+- [ ] RDS endpoint in Secrets Manager (`DATABASE_URL`) points to `us-west-2`
+- [ ] Backend pods connect successfully (check `/api/health` → `"db":"connected"`)
+- [ ] Record failover time in the DR drill log
+
+### Failback to us-east-1
+
+Once `us-east-1` is restored, replay any writes made during the failover window
+using logical replication or a pg_dump diff, then switch Route 53 back and
+decommission the temporary `us-west-2` RDS instance.
