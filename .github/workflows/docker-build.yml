@@ -116,7 +116,7 @@ jobs:
     needs: [build-backend, build-frontend]
     if: github.event_name != 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run Trivy vulnerability scanner on Backend
         uses: aquasecurity/trivy-action@master
