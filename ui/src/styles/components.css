@@ -229,3 +229,105 @@
 }
 .skeleton-row:nth-child(2) { width: 75%; }
 .skeleton-row:nth-child(3) { width: 55%; }
+
+/* ── Responsive Table Scroll Container (issue #996) ───────────── */
+
+/**
+ * .table-scroll-wrapper — outer box; never clips, provides context
+ * .table-scroll-container — the actual overflow scroll region
+ *
+ * Shadow pseudo-elements slide in/out via opacity + CSS var toggles
+ * when the JS component adds has-overflow-left / has-overflow-right.
+ */
+.table-scroll-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* smooth momentum scroll on iOS */
+  scroll-snap-type: none;
+  /* Reserve space so content never jumps when shadows appear */
+  position: relative;
+}
+
+/* ── Scroll shadow indicators ──────────────────────────────────── */
+.table-scroll-container::before,
+.table-scroll-container::after {
+  content: '';
+  position: sticky;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  min-height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  z-index: 1;
+}
+
+/* Left shadow — shown when scrolled right (overflow on the left) */
+.table-scroll-container::before {
+  left: 0;
+  float: left;
+  margin-right: -40px; /* don't consume layout space */
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.15),
+    transparent
+  );
+}
+
+/* Right shadow — shown when more content hides to the right */
+.table-scroll-container::after {
+  right: 0;
+  float: right;
+  margin-left: -40px;
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.15),
+    transparent
+  );
+}
+
+.table-scroll-container.has-overflow-left::before  { opacity: 1; }
+.table-scroll-container.has-overflow-right::after  { opacity: 1; }
+
+/* ── Table itself ──────────────────────────────────────────────── */
+.table-scroll-container table {
+  /* Prevent table from collapsing below its natural width */
+  min-width: max-content;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* ── Column visibility per breakpoint (issue #996) ─────────────── */
+
+/* Hide optional columns on mobile (< 640px) */
+@media (max-width: 639px) {
+  .table-col-optional {
+    display: none;
+  }
+
+  /* Ensure at minimum 2 columns (date + amount) are always visible */
+  .table-col-date,
+  .table-col-amount {
+    display: table-cell !important;
+  }
+}
+
+/* Show on tablet (640px–1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .table-col-tablet {
+    display: table-cell !important;
+  }
+}
+
+/* All columns visible on desktop */
+@media (min-width: 1024px) {
+  .table-col-optional,
+  .table-col-tablet {
+    display: table-cell !important;
+  }
+}
