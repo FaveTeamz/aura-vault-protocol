@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SUPPORTED_LANGS } from "@/lib/i18n";
@@ -8,9 +8,9 @@ import AddressBook from "@/components/AddressBook";
 import "@/lib/i18n";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
 export type Currency = "USD" | "EUR" | "BTC";
 export type LanguageCode = "en" | "es" | "fr" | "de" | "zh" | "ar";
+const TOUR_STORAGE_KEY = "aura_tour_completed";
 
 interface Settings {
   // Display preferences
@@ -154,6 +154,11 @@ export default function SettingsPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
+
+  const restartTour = useCallback(() => {
+    localStorage.removeItem(TOUR_STORAGE_KEY);
+    window.location.href = "/";
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100">
@@ -402,6 +407,14 @@ export default function SettingsPage() {
           <h2 className="text-lg font-medium mb-3">Address Book</h2>
               Save and label frequently used Stellar addresses for quick access during withdrawals.
             <AddressBook />
+        {/* Help & Onboarding Tour */}
+          <h2 className="text-lg font-medium mb-3">Help &amp; Onboarding</h2>
+              Restart the guided onboarding tour to re-learn key vault concepts: connecting your wallet, viewing stats, depositing, tracking your portfolio, and harvesting yield.
+            <button
+              onClick={restartTour}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+            >
+              Restart Onboarding Tour
         {/* Danger Zone */}
         <section>
           <h2 className="text-lg font-medium mb-3 text-red-600">{t("settings.danger.title")}</h2>

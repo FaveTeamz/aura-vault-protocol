@@ -18,7 +18,6 @@ import { useState, useEffect, useCallback } from "react";
 // ---------------------------------------------------------------------------
 // Types
 import { useState, useCallback } from "react";
-
 export type WidgetId =
   | "hero"
   | "apy"
@@ -27,7 +26,6 @@ export type WidgetId =
   | "user-position"
   | "referral";
   | "user-position";
-
 export interface WidgetDescriptor {
   id: WidgetId;
   label: string;
@@ -53,9 +51,7 @@ const DEFAULT_LAYOUT: WidgetDescriptor[] = [
   { id: "depositors", label: "Depositors", visible: true },
   { id: "user-position", label: "Your Position", visible: true },
 ];
-
 const STORAGE_KEY = "aura_widget_layout";
-
 // Serialisation helpers
 function loadLayout(): WidgetDescriptor[] {
   if (typeof window === "undefined") return DEFAULT_WIDGETS;
@@ -155,5 +151,13 @@ export function useWidgetLayout() {
     reorder,
     toggle,
     reset,
+export type WidgetId = string;
+export interface WidgetDescriptor { id: WidgetId; visible: boolean; label: string; }
+export type Widget = WidgetDescriptor;
+const DEFAULT_WIDGETS: WidgetDescriptor[] = [];
+export function useWidgetLayout(defaults: WidgetDescriptor[] = DEFAULT_WIDGETS) {
+    widgets: defaults,
+    setWidgets: (_: WidgetDescriptor[]) => {},
+    setOrder: (_items: WidgetDescriptor[]) => {},
   };
 }

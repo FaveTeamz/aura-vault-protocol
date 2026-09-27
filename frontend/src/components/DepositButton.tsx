@@ -2,14 +2,11 @@
 
 import { type ButtonHTMLAttributes, type ReactNode } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
-
 export type ButtonTxState = "idle" | "pending" | "success" | "error";
-
 interface DepositButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   txState?: ButtonTxState;
   children?: ReactNode;
 }
-
 const stateConfig: Record<ButtonTxState, { label: string; classes: string }> = {
   idle: {
     label: "",
@@ -18,17 +15,13 @@ const stateConfig: Record<ButtonTxState, { label: string; classes: string }> = {
   pending: {
     label: "Processing…",
     classes: "bg-indigo-400 cursor-not-allowed text-white",
-  },
   success: {
     label: "✓ Success",
     classes: "bg-emerald-600 text-white",
-  },
   error: {
     label: "✕ Failed",
     classes: "bg-red-600 text-white",
-  },
 };
-
 export default function DepositButton({
   txState = "idle",
   children,
@@ -39,7 +32,6 @@ export default function DepositButton({
   const config = stateConfig[txState];
   const isPending = txState === "pending";
   const isDisabled = disabled || isPending;
-
   return (
     <button
       {...props}
@@ -58,4 +50,9 @@ export default function DepositButton({
       {config.label || children}
     </button>
   );
+import { ReactNode } from "react";
+export type ButtonTxState = "idle"|"pending"|"success"|"error";
+interface DepositButtonProps { txState?: ButtonTxState; onClick?: () => void; className?: string; children?: ReactNode; "data-cy"?: string; }
+export default function DepositButton({ onClick, className="", children }: DepositButtonProps) {
+  return <button onClick={onClick} className={className}>{children}</button>;
 }

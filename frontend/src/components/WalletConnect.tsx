@@ -10,6 +10,9 @@ import {
 } from "./WalletSelectionModal";
 export type WalletType = SupportedWalletId;
 export interface WalletState {
+import { ShareBalanceDisplay } from "@/components/ShareBalanceDisplay";
+type WalletType = "freighter" | "metamask" | "xBull" | "coinbase";
+type WalletState = {
   type: WalletType;
   address: string;
   network: string;
@@ -330,8 +333,6 @@ export default function WalletConnect() {
         type: "metamask",
         address: accounts[0],
       setWallet(state);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      localStorage.setItem(LAST_WALLET_KEY, "metamask");
       markComplete("connect_wallet");
       setShowDropdown(false);
       setError(
@@ -368,6 +369,7 @@ export default function WalletConnect() {
       const accounts = (await provider.request({
         type: "metamask", // Coinbase uses MetaMask-compatible provider
       localStorage.setItem(LAST_WALLET_KEY, "coinbase");
+        type: "coinbase",
           : "Failed to connect to Coinbase Wallet"
   if (wallet) {
     const meta = SUPPORTED_WALLETS_METADATA[wallet.type];

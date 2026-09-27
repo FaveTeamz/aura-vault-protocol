@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import WalletConnect from "@/components/WalletConnect";
 import ProgressBar from "@/components/ProgressBar";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,25 +25,26 @@ export const metadata: Metadata = {
   },
 };
 
- export default function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-        <html
+    <html
       lang="en"
       dir="ltr"
       className="h-full antialiased"
       suppressHydrationWarning
     >
-
       <body className="min-h-full flex flex-col bg-white text-zinc-900 transition-colors duration-200 dark:bg-zinc-950 dark:text-zinc-100">
         <ThemeProvider>
           {/* Slim progress bar for page transitions and API calls (#266) */}
           <Suspense fallback={null}>
             <ProgressBar />
           </Suspense>
+          {/* Onboarding tour — auto-starts on first visit, restartable from Settings */}
+          <OnboardingTour />
 
           <header className="flex items-center justify-between border-b border-zinc-200 px-6 py-3 dark:border-zinc-800">
             <a href="/" className="text-sm font-semibold tracking-tight">
@@ -84,4 +86,3 @@ export const metadata: Metadata = {
     </html>
   );
 }
-

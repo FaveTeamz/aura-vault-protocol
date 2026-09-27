@@ -1,14 +1,12 @@
 "use client";
 
 type EmptyVariant = "no-transactions" | "no-data" | "no-positions" | string;
-
 interface EmptyStateProps {
   variant?: EmptyVariant;
   title?: string;
   description?: string;
   className?: string;
 }
-
 const variantDefaults: Record<string, { title: string; description: string; icon: string }> = {
   "no-transactions": {
     title: "No transactions yet",
@@ -19,14 +17,11 @@ const variantDefaults: Record<string, { title: string; description: string; icon
     title: "No data available",
     description: "Data will appear here once it's available.",
     icon: "📊",
-  },
   "no-positions": {
     title: "No positions",
     description: "Deposit tokens to get started.",
     icon: "💰",
-  },
 };
-
 export function EmptyState({
   variant = "no-data",
   title,
@@ -34,7 +29,6 @@ export function EmptyState({
   className = "",
 }: EmptyStateProps) {
   const defaults = variantDefaults[variant] ?? variantDefaults["no-data"];
-
   return (
     <div
       className={`flex flex-col items-center justify-center gap-2 text-center py-8 ${className}`}
@@ -49,7 +43,7 @@ export function EmptyState({
       </p>
       <p className="text-xs text-zinc-400">
         {description ?? defaults.description}
-      </p>
     </div>
   );
-}
+interface EmptyStateProps { variant?: string; className?: string; }
+export function EmptyState({ className="" }: EmptyStateProps) { return <div className={className} />; }

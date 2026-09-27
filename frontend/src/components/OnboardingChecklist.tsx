@@ -130,7 +130,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       // Ignore storage errors
     }
   }, []);
-
   return (
     <OnboardingContext.Provider value={{ markComplete }}>
       {children}
@@ -237,5 +236,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
             </p>
       </div>
     </OnboardingContext.Provider>
-  );
+// Stub for OnboardingChecklist — full implementation tracked in a separate issue.
+export type OnboardingMilestone =
+  | "make_first_deposit";
+export function useOnboarding() {
+  return {
+    markComplete: (_milestone: OnboardingMilestone) => {},
+    completedMilestones: [] as OnboardingMilestone[],
+  };
 }

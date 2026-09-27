@@ -7,7 +7,6 @@ interface ShareBalanceDisplayProps {
   variant?: "compact" | "full";
   className?: string;
 }
-
 export function ShareBalanceDisplay({
   shares,
   sharePrice,
@@ -20,11 +19,9 @@ export function ShareBalanceDisplay({
   const usdValue = !isNaN(sharesNum) && !isNaN(priceNum)
     ? (sharesNum * priceNum).toLocaleString(undefined, { maximumFractionDigits: 4 })
     : "—";
-
   const formattedShares = !isNaN(sharesNum)
     ? sharesNum.toLocaleString(undefined, { maximumFractionDigits: 4 })
     : shares;
-
   if (variant === "compact") {
     return (
       <span className={`font-mono tabular-nums ${className}`}>
@@ -32,12 +29,10 @@ export function ShareBalanceDisplay({
       </span>
     );
   }
-
   return (
     <div className={`flex flex-col gap-0.5 ${className}`}>
       <span className="font-mono tabular-nums text-sm font-semibold text-zinc-900 dark:text-zinc-50">
         {formattedShares} shares
-      </span>
       <span className="font-mono tabular-nums text-xs text-zinc-500">
         ≈ {usdValue}
         {sharePriceUpdatedAt && (
@@ -45,7 +40,12 @@ export function ShareBalanceDisplay({
             @ {parseFloat(sharePrice).toFixed(4)}/share
           </span>
         )}
-      </span>
     </div>
   );
+  address?: string;
+  shares?: string;
+  sharePrice?: string;
+  variant?: string;
+export function ShareBalanceDisplay({ className = "" }: ShareBalanceDisplayProps) {
+  return <span className={className} />;
 }

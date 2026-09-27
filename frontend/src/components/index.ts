@@ -57,3 +57,4 @@ export {
 // Keyboard shortcuts (#269)
 export { KeyboardShortcutHelp } from "./KeyboardShortcutHelp";
 export { startProgress, doneProgress } from "./ProgressBar";
+export { OnboardingTour, useRestartTour } from "./OnboardingTour";
