@@ -144,7 +144,7 @@ body {
 .skeleton-wrapper {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-row {
@@ -162,7 +162,7 @@ body {
 .skeleton-row--sm { height: 0.875rem; }
 .skeleton-row--lg { height: 1.75rem; }
 .skeleton-row--input { height: 2.5rem; border-radius: var(--radius); }
-.skeleton-row--btn { height: 2.5rem; width: 40%; border-radius: var(--radius); margin-top: var(--sp-2); }
+.skeleton-row--btn { height: 2.5rem; width: 40%; border-radius: var(--radius); margin-top: var(--spacing-sm); }
 
 .skeleton-row:nth-child(2) { width: 75%; }
 .skeleton-row:nth-child(3) { width: 55%; }
@@ -191,14 +191,14 @@ body {
 .skeleton-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--sp-4);
+  gap: var(--spacing-md);
 }
 
 .skeleton-card {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-surface-raised);
@@ -207,34 +207,34 @@ body {
 .skeleton-card__header {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-card__footer {
   display: flex;
   justify-content: space-between;
-  gap: var(--sp-3);
-  margin-top: var(--sp-2);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
 }
 
 /* Table skeleton */
 .skeleton-table {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
 }
 
 .skeleton-table__head,
 .skeleton-table__row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .skeleton-table__head {
   border-bottom: 1px solid var(--color-surface-raised);
-  padding-bottom: var(--sp-3);
+  padding-bottom: var(--spacing-sm);
 }
 
 .skeleton-table__row:nth-child(even) {
@@ -246,8 +246,8 @@ body {
 .skeleton-graph {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-4);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-surface-raised);
@@ -256,7 +256,7 @@ body {
 .skeleton-graph__bars {
   display: flex;
   align-items: flex-end;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
   height: 160px;
 }
 
@@ -283,13 +283,13 @@ body {
 .skeleton-form {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
+  gap: var(--spacing-md);
 }
 
 .skeleton-form__field {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--spacing-sm);
 }
 
 /* Loading indicator with progress bar */
