@@ -3,12 +3,23 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+// Issue #284: PWA service worker registration
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Aura Vault Protocol",
-  description: "Aura Vault Protocol",
+  description:
+    "Share-based yield vault on Stellar — deposit, compound, and withdraw with Freighter.",
+  manifest: "/manifest.json",
+  // Issue #284: PWA theme colour used by browsers on mobile
+  themeColor: "#6366f1",
+  appleWebApp: {
+    capable: true,
+    title: "Aura Vault",
+    statusBarStyle: "black-translucent",
+  },
 };
 
  export default function RootLayout({
@@ -54,6 +65,8 @@ export const metadata: Metadata = {
           </header>
 
           {children}
+          {/* Issue #284: PWA install prompt */}
+          <ServiceWorkerRegistration />
         </ThemeProvider>
       </body>
     </html>
