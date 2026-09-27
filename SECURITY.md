@@ -776,3 +776,423 @@ Security researchers acting in good faith under this policy — who do not explo
 *This document is the authoritative security reference for Aura Vault Protocol. It is updated with each release. For questions not addressed here, open a GitHub issue or email the security contact in the repository profile.*
 
 *Last reviewed: 2026-08-30*
+
+---
+
+## 14. STRIDE Threat Model
+
+This section provides a formal threat model for Aura Vault Protocol using the **STRIDE** methodology (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege). Each threat is rated by **Likelihood × Impact** and paired with implemented mitigations and acknowledged residual risks.
+
+External audit findings referenced throughout this section are documented in [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
+
+---
+
+### 14.1 System Diagram
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                       THREAT BOUNDARY                             │
+│                                                                   │
+│  ┌──────────────┐   HTTPS    ┌──────────────────────────────┐    │
+│  │  Web Browser │◄──────────►│  Backend API (Express v5)    │    │
+│  │  (Frontend)  │            │  JWT · Zod · Helmet · CORS   │    │
+│  └──────┬───────┘            └──────────┬───────────────────┘    │
+│         │                               │                         │
+│   Freighter Wallet                ┌─────▼──────┐                 │
+│   (XDR signing)                   │ PostgreSQL  │                 │
+│         │                         │   Redis     │                 │
+│         │                         └─────────────┘                │
+│         │ XDR / Soroban RPC                                       │
+│  ┌──────▼───────────────────────────────────────────────────┐    │
+│  │             Stellar / Soroban Runtime                     │    │
+│  │   ┌─────────────────────────────────────────────────┐    │    │
+│  │   │  AuraVault WASM Contract                         │    │    │
+│  │   │  initialize · deposit · withdraw · harvest       │    │    │
+│  │   │  CEI · flash-loan guard · overflow checks        │    │    │
+│  │   └─────────────────────────────────────────────────┘    │    │
+│  └──────────────────────────────────────────────────────────┘    │
+│                                                                   │
+│  ┌───────────────┐  ┌────────────────┐  ┌──────────────────┐    │
+│  │  AWS Secrets  │  │  K8s / Docker  │  │  GitHub Actions  │    │
+│  │  Manager      │  │  Container env │  │  CI/CD Pipeline  │    │
+│  └───────────────┘  └────────────────┘  └──────────────────┘    │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+**Trust zones:**
+- **Untrusted:** Browser, wallet extension, external keepers, internet
+- **Semi-trusted:** Backend API process (can be compromised if secrets leak)
+- **Trusted:** Soroban runtime, Stellar consensus, AWS Secrets Manager
+- **Fully trusted:** Deployed contract bytecode (immutable until governance upgrade)
+
+---
+
+### 14.2 Threat Rating Scale
+
+| Score | Likelihood | Impact |
+|---|---|---|
+| 1 | Very Low — requires nation-state or cryptographic break | Negligible — no user funds at risk |
+| 2 | Low — requires significant attacker resources | Minor — inconvenience only |
+| 3 | Medium — motivated attacker with moderate skill | Moderate — partial fund loss or data breach |
+| 4 | High — scriptable, well-documented attack path | Severe — significant fund loss |
+| 5 | Very High — automated / opportunistic | Critical — total fund loss or system compromise |
+
+**Risk Score = Likelihood × Impact**. Thresholds: ≤4 Low, 5–9 Medium, 10–16 High, 17–25 Critical.
+
+---
+
+### 14.3 Smart Contract Threat Matrix
+
+#### SC-1 — Reentrancy Attack
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering, Elevation of Privilege |
+| **Likelihood** | 2 |
+| **Impact** | 5 |
+| **Risk Score** | 10 (High) |
+| **Attack vector** | A malicious SEP-41 token contract calls back into `deposit`, `withdraw`, or `harvest` during token transfer to double-spend or drain the vault. |
+
+**Mitigations:**
+- CEI (Checks-Effects-Interactions) ordering: all state is updated **before** any token transfer is initiated on every mutating path.
+- Soroban's WASM execution model does not support mid-transaction reentrancy in the same way EVM does; cross-contract calls are synchronous and stack-bounded.
+- A reentrancy guard (`with_reentrancy_guard`) wraps all mutating entry points.
+- Comprehensive reentrancy tests in `aura-vault/src/reentrancy_test.rs`.
+
+**Residual risk:** A future Soroban runtime upgrade could alter cross-contract call semantics. The CEI pattern and reentrancy guard provide defence-in-depth that is runtime-agnostic. Rated residual Low.
+
+---
+
+#### SC-2 — Flash Loan Manipulation
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering |
+| **Likelihood** | 3 |
+| **Impact** | 5 |
+| **Risk Score** | 15 (High) |
+| **Attack vector** | An attacker borrows large amounts of the underlying token in the same transaction, temporarily inflating `total_assets` to manipulate share pricing, then repays before the transaction closes. |
+
+**Mitigations:**
+- Flash loan guard: before every mutating call, the actual on-chain balance is read and compared against `total_deposited`. Any mismatch returns `VaultError::BalanceMismatch` and emits a `suspicious` event.
+- Because the check runs at the very start (before any logic), even an in-transaction balance manipulation is detected.
+
+**Residual risk:** If the underlying token itself performs re-entrant balance manipulation during the balance check call, this guard could theoretically be bypassed. This is a trusted-token assumption (see §2.1). Rated residual Low given operator token selection control.
+
+---
+
+#### SC-3 — Governance Attack / Timelock Bypass
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Elevation of Privilege, Tampering |
+| **Likelihood** | 2 |
+| **Impact** | 5 |
+| **Risk Score** | 10 (High) |
+| **Attack vector** | An attacker compromises enough governance signers (≥3 of 5) to pass a malicious upgrade proposal before the timelock expires, or bypasses the timelock entirely. |
+
+**Mitigations:**
+- 3-of-5 multi-sig threshold: requires compromise of 3 independent signer keys simultaneously.
+- 48-hour timelock: all governance proposals have a mandatory waiting period before execution; monitored by `TimelockNotExpired` error and on-chain events.
+- `AlreadyVoted` guard prevents replay of a single signer's vote.
+- Governance events emit for every proposal creation, vote, and execution — monitored by the Prometheus alert stack.
+- Emergency pause is separate from governance and can halt the vault within a single transaction.
+
+**Residual risk:** Social engineering of governance signers remains a non-zero risk. Hardware security keys for signers are strongly recommended but not enforced by the contract. Rated residual Medium.
+
+---
+
+#### SC-4 — Inflation Attack (Share Price Manipulation)
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering |
+| **Likelihood** | 2 |
+| **Impact** | 4 |
+| **Risk Score** | 8 (Medium) |
+| **Attack vector** | Attacker is first depositor with 1 share, then directly sends tokens to the vault address to inflate `total_assets` without minting shares. Subsequent depositors receive 0 shares (funds stolen). |
+
+**Mitigations (two-layer defence):**
+1. Flash loan guard: direct token transfer makes `actual_balance > total_deposited`, triggering `BalanceMismatch` and blocking all vault operations.
+2. Zero-share rejection: even if the guard fails, `new_shares == 0` deposits are rejected with `VaultError::ZeroAmount`.
+
+**Residual risk:** Both defence layers must fail simultaneously. This requires a bug in the Soroban token balance read **and** an arithmetic edge case — an extremely unlikely combination. Rated residual Very Low.
+
+---
+
+#### SC-5 — Arithmetic Overflow in Share Formula
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering, Denial of Service |
+| **Likelihood** | 2 |
+| **Impact** | 4 |
+| **Risk Score** | 8 (Medium) |
+| **Attack vector** | A deposit amount combined with a large `total_shares` value causes `amount × total_shares` to overflow `i128::MAX`, corrupting share accounting. |
+
+**Mitigations:**
+- All arithmetic uses `checked_mul` / `checked_div`; any overflow returns `VaultError::MathOverflow` rather than wrapping or panicking.
+- `overflow-checks = true` in the Cargo release profile catches any unchecked arithmetic missed during review.
+- Property-based fuzz tests in `overflow_fuzz.rs` cover adversarial input ranges near `i128::MAX`.
+
+**Residual risk:** The `i128` range is sufficient for all foreseeable TVL values with 7-decimal precision (safe up to ~10^19 tokens). Rated residual Very Low.
+
+---
+
+### 14.4 Backend API Threat Matrix
+
+#### API-1 — Authentication Bypass / JWT Forgery
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Spoofing, Elevation of Privilege |
+| **Likelihood** | 3 |
+| **Impact** | 3 |
+| **Risk Score** | 9 (Medium) |
+| **Attack vector** | An attacker forges a JWT to impersonate a user and access authenticated endpoints (`/api/users/preferences`, `/api/v1/yield/calculate`). Alternatively, a stolen refresh token is replayed after logout. |
+
+**Mitigations:**
+- HS256 JWT with a 256-bit secret stored in AWS Secrets Manager (never in environment files in production).
+- 15-minute access token expiry limits the window of a stolen token.
+- Refresh token rotation: each use invalidates the previous token.
+- Logout blacklists the refresh token in Redis (`JWT_BLACKLIST:` key prefix).
+- `authMiddleware.ts` validates signature, expiry, and blacklist on every protected request.
+
+**Residual risk:** If the JWT secret is leaked (e.g., via secrets management failure), all active sessions are compromised. Mitigated by secret rotation procedures in `docs/secrets-management.md`. Rated residual Low.
+
+---
+
+#### API-2 — SQL Injection
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering, Information Disclosure |
+| **Likelihood** | 2 |
+| **Impact** | 4 |
+| **Risk Score** | 8 (Medium) |
+| **Attack vector** | Unsanitised user input is interpolated into a SQL query, allowing an attacker to read, modify, or delete database records. |
+
+**Mitigations:**
+- All database queries use parameterised queries via the `pg` client (`$1`, `$2` placeholders). No string interpolation into SQL.
+- Zod schema validation on all input before it reaches the database layer.
+- OWASP audit confirmed zero SQL injection vulnerabilities (see `AUDIT.md`).
+- Database user has minimal privileges (SELECT/INSERT/UPDATE on vault tables; no DROP/CREATE).
+
+**Residual risk:** ORM or raw query additions in future development could reintroduce this risk. Code review guidelines require parameterised queries in all PRs. Rated residual Very Low.
+
+---
+
+#### API-3 — Rate Limit Evasion
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Denial of Service |
+| **Likelihood** | 4 |
+| **Impact** | 2 |
+| **Risk Score** | 8 (Medium) |
+| **Attack vector** | An attacker rotates IP addresses (via proxies or botnets) to bypass per-IP rate limits and overwhelm the API with high-frequency requests. |
+
+**Mitigations:**
+- Per-IP rate limits via `express-rate-limit` with Redis sliding-window counters.
+- Per-user rate limits applied post-authentication for authenticated endpoints.
+- Aggressive rate limiting on auth endpoints (`/api/auth/login`, `/api/auth/refresh`).
+- CloudFront WAF rules apply additional rate limiting at the CDN layer before requests reach the origin.
+
+**Residual risk:** Distributed botnets with thousands of unique IPs can still degrade service. Full DDoS mitigation requires Cloudflare/AWS Shield (not yet implemented). Rated residual Medium — **accepted risk** given current threat model and cost of mitigation.
+
+---
+
+#### API-4 — Sensitive Data Exposure via Logging
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Information Disclosure |
+| **Likelihood** | 3 |
+| **Impact** | 3 |
+| **Risk Score** | 9 (Medium) |
+| **Attack vector** | JWT tokens, database URLs, or private keys are inadvertently logged to stdout or shipped to the Loki log aggregator. |
+
+**Mitigations:**
+- Winston logger configuration strips known sensitive fields (`password`, `token`, `secret`, `Authorization`) from log output.
+- `DATABASE_URL` and `JWT_SECRET` are never echoed at startup — only their parsed presence is confirmed.
+- Log shipping to Loki excludes HTTP request bodies.
+- `scripts/replace-console.mjs` rewrites bare `console.log` calls to the structured Winston logger in CI.
+
+**Residual risk:** New code paths that log raw request objects could inadvertently capture bearer tokens in headers. Linting rules flag `console.log` usage in CI. Rated residual Low.
+
+---
+
+### 14.5 Infrastructure Threat Matrix
+
+#### INF-1 — Secrets Exposure (Leaked Credentials)
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Information Disclosure, Elevation of Privilege |
+| **Likelihood** | 2 |
+| **Impact** | 5 |
+| **Risk Score** | 10 (High) |
+| **Attack vector** | AWS credentials, JWT secrets, or database passwords are committed to the git repository, exposed in CI logs, or leaked via a compromised container. |
+
+**Mitigations:**
+- All secrets stored in AWS Secrets Manager; injected as environment variables at runtime via K8s Secrets (sealed with Sealed Secrets or external-secrets-operator).
+- `.gitignore` excludes `.env`, `*.pem`, and other sensitive files.
+- Trivy secret scanning runs on every PR (`trivy-scanning.yml`) and blocks merge if secrets are detected.
+- GitHub Actions secrets are masked in CI logs.
+- Secrets rotation Lambda runs weekly (`infrastructure/lambda/secrets-rotation/`).
+
+**Residual risk:** A compromised CI runner or a misconfigured secret reference could still expose credentials. Blast radius is reduced by per-service secrets with minimal IAM permissions. Rated residual Low.
+
+---
+
+#### INF-2 — Container Escape / Privilege Escalation
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Elevation of Privilege |
+| **Likelihood** | 1 |
+| **Impact** | 5 |
+| **Risk Score** | 5 (Medium) |
+| **Attack vector** | An attacker exploits a container runtime vulnerability to escape the pod boundary and access the underlying EC2 instance or other containers. |
+
+**Mitigations:**
+- Containers run as non-root users (`USER node` in Dockerfiles).
+- K8s pods have `securityContext: runAsNonRoot: true`, `readOnlyRootFilesystem: true`, `allowPrivilegeEscalation: false`.
+- Network policies restrict inter-pod communication to declared routes only.
+- Trivy scans container images for known CVEs on every build.
+
+**Residual risk:** Zero-day container runtime vulnerabilities are by definition unpatched. Runtime security tooling (Falco) is on the roadmap but not yet deployed. Rated residual Low — **accepted risk**.
+
+---
+
+#### INF-3 — Supply Chain Compromise (Malicious Dependency)
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering |
+| **Likelihood** | 2 |
+| **Impact** | 4 |
+| **Risk Score** | 8 (Medium) |
+| **Attack vector** | A malicious actor publishes a compromised version of a direct or transitive npm/cargo dependency that injects backdoor code into the build. |
+
+**Mitigations:**
+- `cargo audit` and `npm audit` run in CI on every push.
+- `package-lock.json` and `Cargo.lock` are committed and checked for integrity.
+- Dependabot auto-merge workflow (`dependabot-auto-merge.yml`) handles patch-level bumps after CI passes.
+- CodeQL analysis scans for known vulnerability patterns.
+- Pinned dependency versions in `package.json` and `Cargo.toml`.
+
+**Residual risk:** Typosquatting of popular packages remains a risk. Manual review of new direct dependencies is required by the contribution guidelines. Rated residual Low.
+
+---
+
+### 14.6 Frontend Threat Matrix
+
+#### FE-1 — Cross-Site Scripting (XSS)
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering, Information Disclosure |
+| **Likelihood** | 3 |
+| **Impact** | 3 |
+| **Risk Score** | 9 (Medium) |
+| **Attack vector** | An attacker injects malicious scripts via user-controlled content (e.g., a vault name or transaction memo field rendered unsafely) to steal wallet keys or session tokens. |
+
+**Mitigations:**
+- React's JSX escapes all interpolated values by default, preventing reflected XSS.
+- Content Security Policy (CSP) header via Helmet restricts script sources to `'self'` and trusted CDN origins.
+- `dangerouslySetInnerHTML` is forbidden by ESLint rule; zero occurrences verified in audit.
+- HttpOnly cookies for refresh tokens prevent JavaScript access to session credentials.
+
+**Residual risk:** Third-party wallet extensions execute in the same browser context and could be malicious. Users must exercise due diligence in wallet extension selection. Rated residual Low.
+
+---
+
+#### FE-2 — Wallet Phishing / Transaction Manipulation
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Spoofing, Tampering |
+| **Likelihood** | 3 |
+| **Impact** | 4 |
+| **Risk Score** | 12 (High) |
+| **Attack vector** | A look-alike frontend URL tricks a user into approving a malicious transaction in their wallet, or a MITM attack substitutes a different XDR before the wallet sees it. |
+
+**Mitigations:**
+- HTTPS enforced everywhere; HSTS header prevents protocol downgrade.
+- The frontend displays the exact contract ID and transaction parameters for user review before wallet signing.
+- Freighter and other Stellar wallets display the full XDR for user confirmation; the frontend cannot override this display.
+- DNS monitoring (`dns-monitoring.tf`) alerts on unexpected DNS changes within 5 minutes.
+
+**Residual risk:** Homoglyph domain attacks (e.g., `aura-vau1t.io`) cannot be prevented by the protocol itself. Users must verify the domain before signing. Public domain verification procedures are documented in the user security best-practices section (§12). Rated residual Medium — **accepted risk** inherent to web-based DeFi.
+
+---
+
+#### FE-3 — CSP Bypass
+
+| Attribute | Value |
+|---|---|
+| **STRIDE Category** | Tampering |
+| **Likelihood** | 2 |
+| **Impact** | 3 |
+| **Risk Score** | 6 (Medium) |
+| **Attack vector** | An attacker exploits a misconfigured CSP directive (e.g., `unsafe-inline` or an overly broad wildcard) to execute arbitrary scripts despite CSP being present. |
+
+**Mitigations:**
+- CSP headers generated by Helmet with nonce-based `script-src`.
+- No `unsafe-inline` or `unsafe-eval` in the production CSP.
+- CSP is tested in the Lighthouse CI workflow.
+
+**Residual risk:** Inline event handlers in third-party libraries could require `unsafe-inline` exceptions. All third-party inclusions are reviewed for this during dependency updates. Rated residual Low.
+
+---
+
+### 14.7 Consolidated Risk Summary
+
+| ID | Threat | Likelihood | Impact | Risk Score | Status |
+|---|---|---|---|---|---|
+| SC-1 | Reentrancy | 2 | 5 | **10 High** | Mitigated (CEI + guard) |
+| SC-2 | Flash loan | 3 | 5 | **15 High** | Mitigated (balance check) |
+| SC-3 | Governance attack | 2 | 5 | **10 High** | Mitigated (3-of-5 + timelock) |
+| SC-4 | Inflation attack | 2 | 4 | **8 Medium** | Mitigated (dual layer) |
+| SC-5 | Arithmetic overflow | 2 | 4 | **8 Medium** | Mitigated (checked_*) |
+| API-1 | JWT forgery | 3 | 3 | **9 Medium** | Mitigated (rotation + blacklist) |
+| API-2 | SQL injection | 2 | 4 | **8 Medium** | Mitigated (parameterised) |
+| API-3 | Rate limit evasion | 4 | 2 | **8 Medium** | Partial — accepted residual |
+| API-4 | Log data exposure | 3 | 3 | **9 Medium** | Mitigated (log scrubbing) |
+| INF-1 | Secrets exposure | 2 | 5 | **10 High** | Mitigated (Secrets Manager) |
+| INF-2 | Container escape | 1 | 5 | **5 Medium** | Accepted residual |
+| INF-3 | Supply chain | 2 | 4 | **8 Medium** | Mitigated (audit + lockfiles) |
+| FE-1 | XSS | 3 | 3 | **9 Medium** | Mitigated (CSP + React escaping) |
+| FE-2 | Wallet phishing | 3 | 4 | **12 High** | Accepted residual (user education) |
+| FE-3 | CSP bypass | 2 | 3 | **6 Medium** | Mitigated (nonce-based CSP) |
+
+---
+
+### 14.8 Explicitly Accepted Residual Risks
+
+The following risks have been assessed and **explicitly accepted** by the protocol maintainers. They are documented here for transparency:
+
+1. **Distributed DDoS (API-3 residual):** Full DDoS mitigation requires infrastructure investment (AWS Shield Advanced, Cloudflare) that is not yet cost-justified given current TVL. The current rate limiting provides adequate protection against opportunistic attacks.
+
+2. **Wallet phishing look-alike domains (FE-2 residual):** The protocol cannot prevent attackers registering similar domains. Mitigation is user education (§12) and DNS monitoring with rapid incident response.
+
+3. **Container escape via zero-day (INF-2 residual):** Zero-day container runtime vulnerabilities are unpatchable until disclosed. Runtime security monitoring (Falco) is on the roadmap for Q1 2027.
+
+4. **Governance signer social engineering (SC-3 residual):** The protocol cannot enforce hardware key usage for governance signers. This is addressed through operational procedures in `GOVERNANCE.md`.
+
+---
+
+### 14.9 External Audit References
+
+All smart contract findings from the external security audit have been remediated. See [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md) for the full report including:
+
+- 7 smart contract findings (all severity levels)
+- Remediation status for each finding
+- Re-test confirmation from auditors
+- Backend OWASP Top 10 results in [`AUDIT.md`](./AUDIT.md)
+- Property-based fuzz testing results in [`FUZZ_FINDINGS.md`](./FUZZ_FINDINGS.md)
+
+---
+
+*STRIDE threat model added in: [#976](https://github.com/soterika/aura-vault-protocol/issues/976)*
