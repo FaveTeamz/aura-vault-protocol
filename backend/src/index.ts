@@ -9,6 +9,7 @@ import {
   getUserSessions,
   revokeAllSessions,
 } from "./auth.js";
+import { getAnnouncements, createAnnouncement } from "./announcements.js";
 
 const app = express();
 app.use(cors());
@@ -87,6 +88,12 @@ app.post("/api/auth/revoke-all", authenticate, (req, res) => {
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// GET /api/v1/announcements
+app.get("/api/v1/announcements", getAnnouncements);
+
+// POST /api/v1/announcements (admin use)
+app.post("/api/v1/announcements", authenticate, createAnnouncement);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
