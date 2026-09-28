@@ -1,4 +1,8 @@
-import VaultDashboard from "@/components/VaultDashboard";
+"use client";
+
+import Image from "next/image";
+import { useTranslation } from "react-i18next";
+import "@/lib/i18n";
 
 export default function Home() {
   const { t } = useTranslation();

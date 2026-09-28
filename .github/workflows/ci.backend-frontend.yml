@@ -107,10 +107,33 @@ jobs:
       - name: Build backend
         run: npm run build --workspace=backend
 
+  typecheck-frontend:
+    name: TypeScript Type Check (Frontend)
+    runs-on: ubuntu-latest
+    needs: [lint-frontend]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: TypeScript strict check
+        run: npm run typecheck
+
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
-    needs: [lint-frontend]
+    needs: [lint-frontend, typecheck-frontend]
     steps:
       - uses: actions/checkout@v4
 
@@ -149,7 +172,7 @@ jobs:
     name: Analyze Workflow
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint-backend, lint-frontend, test-backend, build-backend, build-frontend, security-scan]
+    needs: [lint-backend, lint-frontend, test-backend, build-backend, build-frontend, typecheck-frontend, security-scan]
     steps:
       - name: Check workflow status
         run: |
@@ -157,7 +180,8 @@ jobs:
              [ "${{ needs.lint-frontend.result }}" = "failure" ] || \
              [ "${{ needs.test-backend.result }}" = "failure" ] || \
              [ "${{ needs.build-backend.result }}" = "failure" ] || \
-             [ "${{ needs.build-frontend.result }}" = "failure" ]; then
+             [ "${{ needs.build-frontend.result }}" = "failure" ] || \
+             [ "${{ needs.typecheck-frontend.result }}" = "failure" ]; then
             echo "Some checks failed"
             exit 1
           fi
