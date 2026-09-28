@@ -9,6 +9,7 @@ import {
   getUserSessions,
   revokeAllSessions,
 } from "./auth.js";
+import { getPreferences, updatePreferences } from "./preferences.js";
 
 const app = express();
 app.use(cors());
@@ -87,6 +88,12 @@ app.post("/api/auth/revoke-all", authenticate, (req, res) => {
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// GET /api/users/preferences
+app.get("/api/users/preferences", authenticate, getPreferences);
+
+// PUT /api/users/preferences
+app.put("/api/users/preferences", authenticate, updatePreferences);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
