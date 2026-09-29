@@ -11,3 +11,12 @@ storybook-static
 .env.*
 !.env.example
 !*.env.example
+
+dist/
+backend/dist/
+backend/node_modules/
+
+# Gas regression — generated measurement file (not the baseline)
+gas-measurements.json
+gas-report.md
+gas-measurement-log.txt

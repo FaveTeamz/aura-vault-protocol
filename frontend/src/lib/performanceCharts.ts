@@ -31,27 +31,36 @@ export interface PerformanceData {
 export function generateMockData(p: TimePeriod): PerformanceData {
   const now = Date.now();
   const days = PERIOD_DAYS[p];
+  const pointCount = p === "All" ? 1000 : days + 1;
   const points: ChartDataPoint[] = [];
   let balance = 1000;
 
-  for (let i = 0; i <= days; i++) {
-    balance += balance * (0.001 + Math.random() * 0.001);
+  for (let i = 0; i < pointCount; i++) {
+    const progress = pointCount <= 1 ? 0 : i / (pointCount - 1);
+    const growthFactor = 1 + 0.0012 + progress * 0.0018 + Math.sin(progress * Math.PI * 2) * 0.0004;
+    balance *= growthFactor;
+    const apy = Math.min(12.0, Math.max(8.0, 8.4 + Math.sin(progress * Math.PI * 2) * 1.8 + progress * 0.8));
+    const yieldEarned = balance - 1000;
+
     points.push({
-      timestamp: now - (days - i) * 86400000,
+      timestamp: now - (pointCount - 1 - i) * 86_400_000,
       balance: parseFloat(balance.toFixed(2)),
-      apy: 8 + Math.random() * 4,
-      yieldEarned: balance - 1000,
+      apy: parseFloat(apy.toFixed(2)),
+      yieldEarned: parseFloat(yieldEarned.toFixed(2)),
     });
   }
 
+  const totalYield = parseFloat((balance - 1000).toFixed(2));
+  const breakdown = [
+    { source: "Trading Fees", amount: parseFloat((totalYield * 0.6).toFixed(2)) },
+    { source: "Yield Farming", amount: parseFloat((totalYield * 0.3).toFixed(2)) },
+    { source: "Governance", amount: parseFloat((totalYield * 0.1).toFixed(2)) },
+  ];
+
   return {
     balanceHistory: points,
-    yieldBreakdown: [
-      { source: "Trading Fees", amount: (balance - 1000) * 0.6 },
-      { source: "Yield Farming", amount: (balance - 1000) * 0.3 },
-      { source: "Governance", amount: (balance - 1000) * 0.1 },
-    ],
-    totalYield: balance - 1000,
+    yieldBreakdown: breakdown,
+    totalYield,
     currentAPY: 10.5,
   };
 }
@@ -68,5 +77,16 @@ export function toCSV(data: PerformanceData): string {
     point.apy.toFixed(2),
     point.yieldEarned.toFixed(2),
   ]);
-  return [headers, ...rows].map((row) => row.join(",")).join("\n");
+
+  const breakdownRows = data.yieldBreakdown.map((item) => {
+    const share = data.totalYield > 0 ? (item.amount / data.totalYield) * 100 : 0;
+    return [
+      "Yield Breakdown",
+      item.source,
+      item.amount.toFixed(2),
+      `${share.toFixed(1)}%`,
+    ];
+  });
+
+  return [headers, ...rows, ...breakdownRows].map((row) => row.join(",")).join("\n");
 }

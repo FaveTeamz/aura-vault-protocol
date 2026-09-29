@@ -10,6 +10,8 @@
   --color-surface:         #1a1d27;
   --color-surface-raised:  #22263a;
   --color-surface-overlay: #2a2f47;
+  --color-skeleton-base:    var(--color-surface-raised);
+  --color-skeleton-shimmer: #2e3350;
   --color-border:          #ffffff18;
   --color-border-strong:   #ffffff30;
 
@@ -118,6 +120,14 @@
   --sp-12:  3rem;      /* 48px */
   --sp-16:  4rem;      /* 64px */
   --sp-20:  5rem;      /* 80px */
+
+  --spacing-xs:  0.25rem;
+  --spacing-sm:  0.5rem;
+  --spacing-md:  1rem;
+  --spacing-lg:  1.5rem;
+  --spacing-xl:  2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
 
   /* ── Border radius ──────────────────────────────────────────── */
   --radius-sm:   0.25rem;

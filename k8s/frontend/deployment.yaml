@@ -65,23 +65,34 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-          livenessProbe:
-            httpGet:
-              path: /
+          # Startup probe: allows up to 60s for Next.js to finish building/starting
+          # (6 failures × 10s period = 60s maximum startup window)
+          startupProbe:
+            tcpSocket:
               port: http
-              scheme: HTTP
-            initialDelaySeconds: 30
+            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
+            failureThreshold: 6
+            successThreshold: 1
+          # Liveness probe: TCP check on port 3000 — avoids false positives from slow
+          # Next.js SSR routes while still catching a completely frozen process
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 5
             failureThreshold: 3
+          # Readiness probe: HTTP check confirms the Next.js server is serving traffic
           readinessProbe:
             httpGet:
               path: /
               port: http
               scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 5
             failureThreshold: 3
           volumeMounts:
             - name: tmp

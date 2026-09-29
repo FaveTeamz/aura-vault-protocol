@@ -7,9 +7,11 @@ import { useInlineLiveRegion } from "./LiveRegion";
 
 interface Props {
   onToast: (msg: ToastMessage) => void;
+  /** Connected wallet address — null when no wallet is connected. */
+  walletAddress: string | null;
 }
 
-export function DepositForm({ onToast }: Props) {
+export function DepositForm({ onToast, walletAddress }: Props) {
   const id = useId();
   const [amount, setAmount] = useState("");
   const [fieldError, setFieldError] = useState("");
@@ -18,8 +20,12 @@ export function DepositForm({ onToast }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { announce, regionProps } = useInlineLiveRegion("polite");
 
+  // useUserPosition is keyed by wallet address; null address is a no-op.
+  const { data: position, optimisticUpdate, revalidate } = useUserPosition(walletAddress);
+
   const validate = (val: string) => {
-    if (!val || isNaN(Number(val)) || Number(val) <= 0) return "Enter a valid amount greater than 0.";
+    if (!val || isNaN(Number(val)) || Number(val) <= 0)
+      return "Enter a valid amount greater than 0.";
     return "";
   };
 
@@ -30,6 +36,24 @@ export function DepositForm({ onToast }: Props) {
     try {
       // Simulate async contract call — replace with actual Soroban invocation
       await new Promise((r) => setTimeout(r, 1200));
+
+      // -----------------------------------------------------------------------
+      // Optimistic update — increment share balance immediately in the SWR
+      // cache so the user sees the new balance without waiting for revalidation.
+      // The real balance is fetched by `revalidate()` right after, and corrects
+      // the cache if the chain value differs (e.g. due to rounding or a revert).
+      // -----------------------------------------------------------------------
+      if (walletAddress) {
+        const currentShares = position?.shares ?? 0n;
+        // Simplified 1:1 share-mint estimate for optimistic preview.
+        // In production, derive this from totalAssets / totalShares ratio.
+        const estimatedNewShares = currentShares + BigInt(Math.floor(Number(amount)));
+        optimisticUpdate(estimatedNewShares);
+      }
+
+      // Confirm by re-fetching the actual chain state
+      revalidate();
+
       setAmount("");
       announce(`Deposited ${amount} tokens successfully.`);
       onToast({ type: "success", text: `Deposited ${amount} tokens successfully.` });

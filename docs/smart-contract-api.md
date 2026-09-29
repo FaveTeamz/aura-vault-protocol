@@ -1,82 +1,90 @@
-# Aura Vault — Smart Contract API Reference
+# Smart Contract API Reference
 
-> **Contract**: `AuraVault`  
-> **Platform**: [Soroban](https://soroban.stellar.org) (Stellar)  
-> **Language**: Rust (`no_std`)  
-> **Source**: `aura-vault/src/lib.rs`
+This document covers every public function of the `AuraVault` Soroban contract: signatures, parameter descriptions, return types, possible errors, and example invocations using the Stellar CLI.
+
+All token amounts are expressed in **stroops** (the smallest indivisible unit). For a token with 7 decimal places (e.g., XLM, USDC on Stellar), 1 token = 10,000,000 stroops.
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Core Vault Functions](#core-vault-functions)
-   - [initialize](#initialize)
-   - [deposit](#deposit)
-   - [withdraw](#withdraw)
-   - [harvest](#harvest)
-   - [harvest_token](#harvest_token)
-3. [View Functions](#view-functions)
-   - [total_assets](#total_assets)
-   - [balance_of](#balance_of)
-   - [is_paused](#is_paused)
-   - [total_fees_collected](#total_fees_collected)
-4. [Admin: Emergency Controls](#admin-emergency-controls)
-   - [pause](#pause)
-   - [unpause](#unpause)
-5. [Admin: Fee Management](#admin-fee-management)
-   - [set_fees](#set_fees)
-   - [set_treasury](#set_treasury)
-   - [withdraw_fees](#withdraw_fees)
-6. [Admin: Yield Token Registry](#admin-yield-token-registry)
-   - [register_yield_token](#register_yield_token)
-7. [Admin: Upgrade](#admin-upgrade)
-   - [upgrade](#upgrade)
-8. [Governance](#governance)
-   - [propose_update_admin](#propose_update_admin)
-   - [propose_update_token](#propose_update_token)
-   - [propose_parameter_update](#propose_parameter_update)
-   - [vote](#vote)
-   - [execute](#execute)
-   - [proposal_status](#proposal_status)
-9. [Events](#events)
-10. [Error Codes](#error-codes)
-11. [Security Model](#security-model)
-12. [Resource Notes](#resource-notes)
+1. [Error Codes](#1-error-codes)
+2. [initialize](#2-initialize)
+3. [deposit](#3-deposit)
+4. [withdraw](#4-withdraw)
+5. [harvest](#5-harvest)
+6. [harvest_token](#6-harvest_token)
+7. [register_yield_token](#7-register_yield_token)
+8. [pause](#8-pause)
+9. [unpause](#9-unpause)
+10. [is_paused](#10-is_paused)
+11. [set_fees](#11-set_fees)
+12. [set_treasury](#12-set_treasury)
+13. [withdraw_fees](#13-withdraw_fees)
+14. [total_fees_collected](#14-total_fees_collected)
+15. [total_assets](#15-total_assets)
+16. [balance_of](#16-balance_of)
+17. [upgrade](#17-upgrade)
+18. [Governance Functions](#18-governance-functions)
+    - [propose_update_admin](#181-propose_update_admin)
+    - [propose_update_token](#182-propose_update_token)
+    - [propose_parameter_update](#183-propose_parameter_update)
+    - [vote](#184-vote)
+    - [execute](#185-execute)
+    - [proposal_status](#186-proposal_status)
+19. [Events Reference](#19-events-reference)
+20. [Storage Layout](#20-storage-layout)
 
 ---
 
-## Overview
+## 1. Error Codes
 
-`AuraVault` is a share-based yield vault on Soroban. It accepts deposits of a
-single SEP-41-compatible underlying token, issues proportional vault shares,
-and allows keepers to compound yield via `harvest`. A multisig governance
-layer controls sensitive parameter changes with a 24-hour timelock.
+All mutating functions return `Result<_, VaultError>`. The following error codes can be returned:
 
-### Share Pricing
-
-| Scenario | Formula |
-|---|---|
-| First depositor (empty vault) | `shares = amount` (1:1 seed) |
-| Subsequent depositors | `shares = floor(amount × total_shares / total_assets)` |
-| Redemption | `tokens = floor(shares × total_assets / total_shares)` |
-
-Yield injected via `harvest` increases `total_assets` without minting new
-shares, which raises the redemption rate for all existing shareholders.
+| Code | Variant | Description |
+|---|---|---|
+| 1 | `NotInitialized` | Vault has not been initialized yet |
+| 2 | `AlreadyInitialized` | `initialize` was called more than once |
+| 3 | `InsufficientShares` | Caller's share balance is less than the requested withdrawal amount |
+| 4 | `InsufficientUnderlying` | Vault's token balance cannot cover the redemption |
+| 5 | `ZeroAmount` | Input is zero, negative, or computed shares/tokens round to zero |
+| 6 | `MathOverflow` | Integer overflow during share/token arithmetic |
+| 7 | `InvalidAddress` | Address is not in the governance signers list, or token is not whitelisted |
+| 8 | `ZeroShares` | `harvest` called when `total_shares == 0` (nobody has deposited yet) |
+| 9 | `UpgradeUnauthorized` | Caller is not the stored admin |
+| 10 | `StorageLayoutMismatch` | On-chain layout version does not match `CURRENT_LAYOUT_VERSION` |
+| 11 | `VaultPaused` | Mutating operation called while the vault is paused |
+| 12 | `BalanceMismatch` | Flash loan guard: actual token balance ≠ `total_deposited` |
+| 13 | `TimelockNotExpired` | Governance timelock has not elapsed |
+| 14 | `NotApproved` | Proposal has not reached required signature threshold |
+| 15 | `AlreadyVoted` | Signer already voted on this proposal |
+| 16 | `TvlCapExceeded` | Deposit would exceed the configured TVL cap |
+| 17 | `YieldTooSmall` | Yield rounds to zero per share — accumulate more before distributing |
+| 18 | `DistributionAccuracyError` | Rounding error exceeds 0.01% accuracy threshold |
+| 19 | `HarvestCooldown` | Harvest attempted before the cooldown period has elapsed |
+| 20 | `WithdrawalQueued` | Withdrawal queued; call `claim_queued_withdrawal` after unbonding |
+| 21 | `QueueEntryNotFound` | Queue entry does not exist or was already claimed |
+| 22 | `QueueUnbondingPending` | Queue entry is still within the unbonding period |
+| 23 | `InvalidWithdrawalFee` | Withdrawal fee exceeds the 5% maximum |
+| 24 | `TransferFailed` | Token transfer amount assertion failed (fee-on-transfer guard) |
+| 25 | `OraclePriceZero` | Oracle returned a zero price |
+| 26 | `OraclePriceTooHigh` | Oracle price exceeds sanity cap (possible manipulation) |
+| 27 | `OraclePriceStale` | Oracle price is older than the configured `max_age_secs` |
+| 28 | `NotWhitelisted` | Deposit attempted by an address not on the whitelist |
+| 29 | `BelowMinDeposit` | Deposit amount is below the configured minimum |
+| 30 | `OracleUnavailable` | Oracle unavailable; `total_assets_usd` returned fallback value 0 |
+| 31 | `CircuitBreakerTripped` | Share price moved more than the configured limit; vault auto-paused |
 
 ---
 
-## Core Vault Functions
+## 2. initialize
 
-### `initialize`
+One-time setup. Stores the admin address, underlying token address, initial version metadata, and governance signers. Reverts if called more than once.
 
-One-time vault setup. Stores the admin, the underlying SEP-41 token, and the
-governance signer set. Reverts if called a second time.
-
-**Signature**
+### Signature
 
 ```rust
-pub fn initialize(
+fn initialize(
     env: Env,
     admin: Address,
     underlying_token: Address,
@@ -84,243 +92,253 @@ pub fn initialize(
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `admin` | `Address` | Account authorized to call all admin-gated functions. |
-| `underlying_token` | `Address` | SEP-41 token contract address accepted for deposits. |
-| `signers` | `Vec<Address>` | Initial governance multisig signers (≥ 3 recommended). |
+| `admin` | `Address` | The privileged account that can pause, set fees, upgrade, and manage the vault |
+| `underlying_token` | `Address` | The SEP-41-compatible token contract address that the vault holds |
+| `signers` | `Vec<Address>` | List of multi-sig governance signers; 3-of-N approval required for governance proposals |
 
-**Returns** `Ok(())`.
+### Returns
 
-**Errors**
+`Ok(())` on success.
+
+### Errors
 
 | Error | Condition |
 |---|---|
-| `AlreadyInitialized` | `initialize` was already called. |
+| `AlreadyInitialized` | `initialize` has already been called |
 
-**Soroban CLI example**
+### Side effects
+
+- Sets `admin`, `underlying_token`, `total_shares = 0`, `total_deposited = 0`, `version = 1`, `layout_version = 1`
+- Initializes governance signer list
+- Bumps instance TTL (30-day lifetime)
+
+### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --source <ADMIN_KEYPAIR> --network testnet \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
   -- initialize \
-  --admin GADMIN... \
-  --underlying_token CTOKEN... \
-  --signers '["GSIGNER1...", "GSIGNER2...", "GSIGNER3..."]'
+  --admin GADMIN_ADDRESS \
+  --underlying_token GTOKEN_ADDRESS \
+  --signers '["GSIGNER1","GSIGNER2","GSIGNER3"]'
 ```
 
 ---
 
-### `deposit`
+## 3. deposit
 
-Transfer underlying tokens into the vault and receive proportional vault shares.
+Transfer underlying tokens into the vault and receive vault shares proportional to the deposit. Requires caller authorization.
 
-**Signature**
+### Signature
 
 ```rust
-pub fn deposit(
+fn deposit(
     env: Env,
     caller: Address,
     amount: i128,
 ) -> Result<i128, VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `caller` | `Address` | Depositor; must sign the transaction (`require_auth`). |
-| `amount` | `i128` | Underlying tokens to deposit. Must be `> 0`. |
+| `caller` | `Address` | The depositing account; must authorize this transaction |
+| `amount` | `i128` | Amount of underlying tokens to deposit, in stroops (must be > 0) |
 
-**Returns** `Ok(shares_minted: i128)` — vault shares issued to `caller`.
+### Returns
 
-**Errors**
+`Ok(new_shares)` — the number of vault shares minted to the caller, in the same unit as the underlying token stroops.
+
+### Share formula
+
+```
+// First deposit (or when vault is empty):
+new_shares = amount
+
+// Subsequent deposits:
+new_shares = floor(amount × total_shares / total_assets)
+```
+
+### Errors
 
 | Error | Condition |
 |---|---|
-| `NotInitialized` | Vault not yet initialized. |
-| `VaultPaused` | Vault is paused. |
-| `ZeroAmount` | `amount ≤ 0`, or computed shares round to zero. |
-| `BalanceMismatch` | Flash-loan guard: actual token balance ≠ `total_deposited`. |
-| `MathOverflow` | Arithmetic overflow in share formula. |
+| `ZeroAmount` | `amount ≤ 0`, or computed shares round to 0 |
+| `NotInitialized` | Vault not yet initialized |
+| `VaultPaused` | Vault is paused |
+| `BalanceMismatch` | Flash loan guard triggered |
+| `MathOverflow` | Arithmetic overflow in share computation |
 
-**Event emitted**
+### Events emitted
 
 ```
 topics: ("deposit", caller: Address, amount: i128)
-data:   (shares_minted: i128, new_total_shares: i128, new_total_deposited: i128)
+data:   (new_shares: i128, new_total_shares: i128, new_total_deposited: i128)
 ```
 
-**Soroban CLI example**
+### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --source <USER_KEYPAIR> --network testnet \
+  --id CONTRACT_ID \
+  --source depositor-keypair \
+  --network testnet \
   -- deposit \
-  --caller GUSER... \
-  --amount 1000000
+  --caller GDEPOSITOR_ADDRESS \
+  --amount 1000000000
 ```
 
-**JavaScript SDK example**
-
-```ts
-import { nativeToScVal, scValToNative } from "@stellar/stellar-sdk";
-
-const result = await contract.call("deposit", {
-  caller: userKeypair.publicKey(),
-  amount: nativeToScVal(1_000_000n, { type: "i128" }),
-});
-const sharesMinted = scValToNative(result); // i128 as BigInt
-```
+The above deposits 100 tokens (1,000,000,000 stroops for a 7-decimal token).
 
 ---
 
-### `withdraw`
+## 4. withdraw
 
-Burn vault shares and receive the proportional underlying tokens.
+Burn vault shares and redeem the proportional amount of underlying tokens. Requires caller authorization.
 
-**Signature**
+### Signature
 
 ```rust
-pub fn withdraw(
+fn withdraw(
     env: Env,
     caller: Address,
     shares: i128,
 ) -> Result<i128, VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `caller` | `Address` | Share holder; must sign the transaction. |
-| `shares` | `i128` | Vault shares to burn. Must be `> 0` and `≤ caller's balance`. |
+| `caller` | `Address` | The withdrawing account; must authorize this transaction |
+| `shares` | `i128` | Number of vault shares to burn (must be > 0 and ≤ caller's share balance) |
 
-**Returns** `Ok(tokens_redeemed: i128)` — underlying tokens transferred to `caller`.
+### Returns
 
-**Errors**
+`Ok(redeem_amount)` — the number of underlying token stroops transferred to the caller.
+
+### Redeem formula
+
+```
+redeem_amount = floor(shares × total_assets / total_shares)
+```
+
+### Errors
 
 | Error | Condition |
 |---|---|
-| `NotInitialized` | Vault not initialized. |
-| `VaultPaused` | Vault is paused. |
-| `ZeroAmount` | `shares ≤ 0`, or redeemable tokens round to zero. |
-| `InsufficientShares` | `shares > caller's balance`. |
-| `InsufficientUnderlying` | Vault cannot cover the redemption (rounding edge case). |
-| `BalanceMismatch` | Flash-loan guard triggered. |
-| `MathOverflow` | Arithmetic overflow. |
+| `ZeroAmount` | `shares ≤ 0`, or computed redeem amount rounds to 0 |
+| `NotInitialized` | Vault not yet initialized |
+| `VaultPaused` | Vault is paused |
+| `BalanceMismatch` | Flash loan guard triggered |
+| `InsufficientShares` | `shares > caller's balance` |
+| `InsufficientUnderlying` | Vault balance cannot cover `redeem_amount` |
+| `MathOverflow` | Arithmetic overflow in redemption computation |
 
-**Event emitted**
+### Events emitted
 
 ```
 topics: ("withdraw", caller: Address, shares: i128)
-data:   (tokens_redeemed: i128, new_total_shares: i128, new_total_deposited: i128)
+data:   (redeem_amount: i128, new_total_shares: i128, new_total_deposited: i128)
 ```
 
-**Soroban CLI example**
+### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --source <USER_KEYPAIR> --network testnet \
+  --id CONTRACT_ID \
+  --source depositor-keypair \
+  --network testnet \
   -- withdraw \
-  --caller GUSER... \
-  --shares 500000
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("withdraw", {
-  caller: userKeypair.publicKey(),
-  shares: BigInt(500_000),
-});
-// result.value === underlying tokens redeemed (i128 as BigInt)
+  --caller GDEPOSITOR_ADDRESS \
+  --shares 500000000
 ```
 
 ---
 
-### `harvest`
+## 5. harvest
 
-Inject yield (in the underlying token) into the vault without minting new
-shares. Increases the redemption rate for all existing shareholders.
-Permissionless — any address may act as keeper.
+Permissionless keeper entry point. Injects yield (underlying token) into the vault, increasing the exchange rate for all shareholders. A performance fee is deducted before crediting `total_assets`. Requires caller authorization.
 
-A performance fee (in basis points) is deducted from `yield_amount` before
-crediting `total_deposited`; the fee accrues in contract storage for later
-withdrawal by the admin.
-
-**Signature**
+### Signature
 
 ```rust
-pub fn harvest(
+fn harvest(
     env: Env,
     caller: Address,
     yield_amount: i128,
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `caller` | `Address` | Keeper; must sign the transaction and hold enough underlying tokens. |
-| `yield_amount` | `i128` | Yield tokens to transfer into the vault. Must be `> 0`. |
+| `caller` | `Address` | The keeper account injecting yield; must authorize and hold sufficient tokens |
+| `yield_amount` | `i128` | Amount of underlying tokens to inject as yield, in stroops (must be > 0) |
 
-**Returns** `Ok(())`.
+### Returns
 
-**Errors**
+`Ok(())` on success.
+
+### Fee deduction
+
+```
+fee_amount   = floor(yield_amount × perf_fee_bps / 10000)
+yield_net    = yield_amount - fee_amount
+total_assets += yield_net
+fees_collected += fee_amount
+```
+
+Default `perf_fee_bps` = 1000 (10%).
+
+### Errors
 
 | Error | Condition |
 |---|---|
-| `NotInitialized` | Vault not initialized. |
-| `VaultPaused` | Vault is paused. |
-| `ZeroAmount` | `yield_amount ≤ 0`. |
-| `ZeroShares` | No shares exist; yield cannot be attributed. |
-| `BalanceMismatch` | Flash-loan guard triggered. |
-| `MathOverflow` | Arithmetic overflow. |
+| `ZeroAmount` | `yield_amount ≤ 0` |
+| `NotInitialized` | Vault not yet initialized |
+| `VaultPaused` | Vault is paused |
+| `ZeroShares` | `total_shares == 0` (no depositors yet) |
+| `BalanceMismatch` | Flash loan guard triggered |
+| `MathOverflow` | Arithmetic overflow |
 
-**Event emitted**
+### Events emitted
 
 ```
 topics: ("harvest", caller: Address, yield_amount: i128)
-data:   (net_yield: i128, fee_amount: i128, new_total_deposited: i128)
+data:   (yield_net: i128, fee_amount: i128, new_total_assets: i128)
 ```
 
-**Soroban CLI example**
+### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --source <KEEPER_KEYPAIR> --network testnet \
+  --id CONTRACT_ID \
+  --source keeper-keypair \
+  --network testnet \
   -- harvest \
-  --caller GKEEPER... \
-  --yield_amount 50000
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-// Only the admin keypair will pass require_auth
-const result = await contract.call("harvest", {
-  caller: adminKeypair.publicKey(),
-  yield_amount: BigInt(50_000),
-});
-// result.value === void (Ok(()))
+  --caller GKEEPER_ADDRESS \
+  --yield_amount 10000000
 ```
 
 ---
 
-### `harvest_token`
+## 6. harvest_token
 
-Multi-token variant of `harvest`. The caller transfers a whitelisted alternate
-yield token; the vault credits a declared `underlying_amount` to `total_deposited`.
-The alternate token must first be whitelisted via `register_yield_token`.
+Permissionless keeper entry point for whitelisted alternative yield tokens. The keeper provides an alt-token yield amount and the vault's admin-provided equivalent value in the underlying token. Requires caller authorization.
 
-**Signature**
+### Signature
 
 ```rust
-pub fn harvest_token(
+fn harvest_token(
     env: Env,
     caller: Address,
     alt_token: Address,
@@ -329,152 +347,241 @@ pub fn harvest_token(
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `caller` | `Address` | Keeper; must sign. |
-| `alt_token` | `Address` | Whitelisted alternate yield token contract address. |
-| `yield_amount` | `i128` | Amount of `alt_token` to transfer into the vault. |
-| `underlying_amount` | `i128` | Equivalent underlying value to credit (must be `> 0`). |
+| `caller` | `Address` | Keeper account; must authorize |
+| `alt_token` | `Address` | Address of the alternative yield token (must be whitelisted via `register_yield_token`) |
+| `yield_amount` | `i128` | Amount of the alt token to transfer from caller to vault, in that token's stroops |
+| `underlying_amount` | `i128` | Equivalent value in underlying token stroops; used for exchange rate calculation |
 
-**Example (JavaScript SDK)**
+### Returns
 
-```ts
-await contract.call("pause", {});
-```
+`Ok(())` on success.
 
----
-
-**Errors**
+### Errors
 
 | Error | Condition |
 |---|---|
-| `NotInitialized` | Vault not initialized. |
-| `VaultPaused` | Vault is paused. |
-| `ZeroAmount` | Either amount is `≤ 0`. |
-| `ZeroShares` | No shares exist. |
-| `InvalidAddress` | `alt_token` is not whitelisted. |
-| `BalanceMismatch` | Flash-loan guard triggered. |
-| `MathOverflow` | Arithmetic overflow. |
+| `ZeroAmount` | Either `yield_amount ≤ 0` or `underlying_amount ≤ 0` |
+| `NotInitialized` | Vault not yet initialized |
+| `VaultPaused` | Vault is paused |
+| `ZeroShares` | `total_shares == 0` |
+| `InvalidAddress` | `alt_token` is not whitelisted |
+| `BalanceMismatch` | Flash loan guard on underlying token triggered |
+| `MathOverflow` | Arithmetic overflow |
 
-**Event emitted**
+### Events emitted
 
 ```
 topics: ("harvest_token", caller: Address, alt_token: Address)
 data:   (yield_amount: i128, net_underlying: i128, fee_amount: i128)
 ```
 
-**Example (JavaScript SDK)**
-
-```ts
-await contract.call("unpause", {});
-```
-
----
-
-## View Functions
-
-These functions are read-only simulation calls — they write no ledger entries
-and require no authorization.
-
-### `total_assets`
-
-Returns the total underlying tokens currently tracked in the vault.
-
-```rust
-pub fn total_assets(env: Env) -> i128
-```
-
-### `balance_of`
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("is_paused", {});
-const paused: boolean = result.value;
-```
-
----
-
-```rust
-pub fn balance_of(env: Env, address: Address) -> i128
-```
-
-**Soroban CLI example**
+### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --network testnet \
-  -- balance_of --address GUSER...
-```
-
-### `is_paused`
-
-Returns `true` if the vault is currently paused.
-
-```rust
-pub fn is_paused(env: Env) -> bool
-```
-
-### `total_fees_collected`
-
-Returns total performance fees accrued but not yet withdrawn to the treasury.
-
-```rust
-pub fn total_fees_collected(env: Env) -> i128
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("total_assets", {});
-const total: bigint = result.value; // i128 as BigInt
+  --id CONTRACT_ID \
+  --source keeper-keypair \
+  --network testnet \
+  -- harvest_token \
+  --caller GKEEPER_ADDRESS \
+  --alt_token GALT_TOKEN_ADDRESS \
+  --yield_amount 5000000 \
+  --underlying_amount 4800000
 ```
 
 ---
 
-## Admin: Emergency Controls
+## 7. register_yield_token
 
-### `pause`
+Admin-only. Whitelist an alternative yield token so it can be used with `harvest_token`. Requires admin authorization.
 
-Halt `deposit`, `withdraw`, and `harvest`. Only the stored admin may call this.
-
-```rust
-pub fn pause(env: Env, admin: Address) -> Result<(), VaultError>
-```
-
-**Parameters**: `admin` — must match the stored admin address and sign the transaction.
-
-**Event emitted**: `topics: ("paused",), data: ()`
-
-### `unpause`
-
-Resume operations after a pause.
+### Signature
 
 ```rust
-pub fn unpause(env: Env, admin: Address) -> Result<(), VaultError>
+fn register_yield_token(
+    env: Env,
+    alt_token: Address,
+) -> Result<(), VaultError>
 ```
 
-**Example (JavaScript SDK)**
+### Parameters
 
-```ts
-const result = await contract.call("balance_of", {
-  address: userKeypair.publicKey(),
-});
-const shares: bigint = result.value; // i128 as BigInt, 0n for unknown addresses
+| Parameter | Type | Description |
+|---|---|---|
+| `alt_token` | `Address` | Token contract address to whitelist |
+
+### Returns
+
+`Ok(())` on success.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | Caller is not the stored admin |
+
+### Events emitted
+
+```
+topics: ("yield_token_registered",)
+data:   (alt_token: Address,)
+```
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- register_yield_token \
+  --alt_token GALT_TOKEN_ADDRESS
 ```
 
 ---
 
-## Admin: Fee Management
+## 8. pause
 
-### `set_fees`
+Admin-only emergency control. Blocks all mutating operations (`deposit`, `withdraw`, `harvest`). Requires admin authorization.
 
-Set performance and management fee rates. Admin only.
+### Signature
 
 ```rust
-pub fn set_fees(
+fn pause(
+    env: Env,
+    admin: Address,
+) -> Result<(), VaultError>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `admin` | `Address` | Must match the stored admin address; must authorize this transaction |
+
+### Returns
+
+`Ok(())` on success.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | `admin` does not match stored admin |
+
+### Events emitted
+
+```
+topics: ("paused",)
+data:   ()
+```
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- pause \
+  --admin GADMIN_ADDRESS
+```
+
+---
+
+## 9. unpause
+
+Admin-only. Resumes operations after a pause. Requires admin authorization.
+
+### Signature
+
+```rust
+fn unpause(
+    env: Env,
+    admin: Address,
+) -> Result<(), VaultError>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `admin` | `Address` | Must match the stored admin address; must authorize this transaction |
+
+### Returns
+
+`Ok(())` on success.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | `admin` does not match stored admin |
+
+### Events emitted
+
+```
+topics: ("unpaused",)
+data:   ()
+```
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- unpause \
+  --admin GADMIN_ADDRESS
+```
+
+---
+
+## 10. is_paused
+
+Read-only. Returns the current pause state.
+
+### Signature
+
+```rust
+fn is_paused(env: Env) -> bool
+```
+
+### Returns
+
+`true` if the vault is currently paused, `false` otherwise.
+
+### Errors
+
+None. This is a pure read-only call.
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- is_paused
+```
+
+---
+
+## 11. set_fees
+
+Admin-only. Update the performance fee and management fee rates. Requires admin authorization.
+
+### Signature
+
+```rust
+fn set_fees(
     env: Env,
     admin: Address,
     perf_fee_bps: u32,
@@ -482,179 +589,404 @@ pub fn set_fees(
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `admin` | `Address` | Must match stored admin; must sign. |
-| `perf_fee_bps` | `u32` | Performance fee in basis points (100 bps = 1%). |
-| `mgmt_fee_bps` | `u32` | Management fee in basis points. |
+| `admin` | `Address` | Must match the stored admin address; must authorize |
+| `perf_fee_bps` | `u32` | Performance fee in basis points. Default: 1000 (= 10%). Applied to each harvest. |
+| `mgmt_fee_bps` | `u32` | Management fee in basis points. Default: 0. Reserved for future time-based fee logic. |
 
-**Errors**: `NotInitialized`, `UpgradeUnauthorized`.
+**Basis points:** 100 bps = 1%. Valid range is 0–10000 (0%–100%). Setting above 10000 will result in fee amounts exceeding yield, which is invalid — ensure sensible values.
 
-### `set_treasury`
+### Returns
 
-Set the treasury address that receives withdrawn fees. Admin only.
+`Ok(())` on success.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | `admin` does not match stored admin |
+
+### Example
+
+```bash
+# Set performance fee to 5% (500 bps), management fee to 0
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- set_fees \
+  --admin GADMIN_ADDRESS \
+  --perf_fee_bps 500 \
+  --mgmt_fee_bps 0
+```
+
+---
+
+## 12. set_treasury
+
+Admin-only. Set the treasury address where fees are transferred when `withdraw_fees` is called. Requires admin authorization.
+
+### Signature
 
 ```rust
-pub fn set_treasury(
+fn set_treasury(
     env: Env,
     admin: Address,
     treasury: Address,
 ) -> Result<(), VaultError>
 ```
 
-### `withdraw_fees`
+### Parameters
 
-Transfer all accrued fees to the treasury. Returns `0` if no fees have
-accumulated. Admin only.
+| Parameter | Type | Description |
+|---|---|---|
+| `admin` | `Address` | Must match the stored admin address; must authorize |
+| `treasury` | `Address` | The Stellar address that will receive accumulated fees |
 
-```rust
-pub fn withdraw_fees(env: Env, admin: Address) -> Result<i128, VaultError>
+### Returns
+
+`Ok(())` on success.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | `admin` does not match stored admin |
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- set_treasury \
+  --admin GADMIN_ADDRESS \
+  --treasury GTREASURY_ADDRESS
 ```
 
-**Returns** `Ok(fees_transferred: i128)`.
+---
 
-**Errors**: `NotInitialized`, `UpgradeUnauthorized` (no treasury set is treated
-as `NotInitialized`).
+## 13. withdraw_fees
 
-**Event emitted**
+Admin-only. Transfer all accumulated fees from the vault to the treasury address. Requires admin authorization.
+
+### Signature
+
+```rust
+fn withdraw_fees(
+    env: Env,
+    admin: Address,
+) -> Result<i128, VaultError>
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `admin` | `Address` | Must match the stored admin address; must authorize |
+
+### Returns
+
+`Ok(fees_transferred)` — the amount of underlying token stroops sent to the treasury. Returns `0` if there are no fees accumulated.
+
+### Errors
+
+| Error | Condition |
+|---|---|
+| `NotInitialized` | Vault not initialized, or treasury address not set |
+| `UpgradeUnauthorized` | `admin` does not match stored admin |
+
+### Events emitted
 
 ```
 topics: ("fees_withdrawn", admin: Address)
-data:   (amount: i128, treasury: Address)
+data:   (fees: i128, treasury: Address)
 ```
 
-**Example (JavaScript SDK)**
+### Example
 
-```ts
-await contract.call("transfer_admin", {
-  new_admin: newAdminKeypair.publicKey(),
-});
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- withdraw_fees \
+  --admin GADMIN_ADDRESS
 ```
 
 ---
 
-## Admin: Yield Token Registry
+## 14. total_fees_collected
 
-### `register_yield_token`
+Read-only. Returns the total accumulated (unwithdrawn) performance fees held in the vault.
 
-Whitelist an alternate yield token so it can be used with `harvest_token`.
-Admin only.
+### Signature
 
 ```rust
-pub fn register_yield_token(env: Env, alt_token: Address) -> Result<(), VaultError>
+fn total_fees_collected(env: Env) -> i128
 ```
 
-**Event emitted**: `topics: ("yield_token_registered",), data: (alt_token: Address)`
+### Returns
+
+Total accumulated fees in underlying token stroops.
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- total_fees_collected
+```
 
 ---
 
-## Admin: Upgrade
+## 15. total_assets
 
-### `upgrade`
+Read-only. Returns the total amount of underlying tokens currently tracked by the vault (net of fees, including accrued yield).
 
-Atomically replace the contract's executing Wasm bytecode (UUPS-style upgrade).
-The layout version is verified before the swap to prevent accidental storage
-corruption. Admin only.
+### Signature
 
 ```rust
-pub fn upgrade(
+fn total_assets(env: Env) -> i128
+```
+
+### Returns
+
+Total underlying token stroops held and tracked by the vault.
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- total_assets
+```
+
+---
+
+## 16. balance_of
+
+Read-only. Returns the vault share balance for a specific address.
+
+### Signature
+
+```rust
+fn balance_of(env: Env, address: Address) -> i128
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `address` | `Address` | The account to query |
+
+### Returns
+
+Number of vault shares held by `address`. Returns 0 if no balance exists.
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- balance_of \
+  --address GDEPOSITOR_ADDRESS
+```
+
+---
+
+## 16.1 decimals
+
+Read-only. Returns the number of decimal places used by vault shares (e.g. 7 for Stellar standard). Set during `initialize` and immutable thereafter.
+
+### Signature
+
+```rust
+fn decimals(env: Env) -> u32
+```
+
+### Returns
+
+Vault share precision as `u32` (e.g. `7`).
+
+### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- decimals
+```
+
+---
+
+## 17. upgrade
+
+Admin-only. Upgrade the contract's Wasm bytecode to a new version. Requires admin authorization. Fails if the on-chain storage layout version does not match `CURRENT_LAYOUT_VERSION`.
+
+### Signature
+
+```rust
+fn upgrade(
     env: Env,
     new_wasm_hash: BytesN<32>,
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `new_wasm_hash` | `BytesN<32>` | Hash returned by `stellar contract upload`. |
+| `new_wasm_hash` | `BytesN<32>` | The 32-byte hash of the new Wasm binary, obtained from `stellar contract upload` |
 
-**Errors**
+### Returns
+
+`Ok(())` on success. The contract version counter is incremented.
+
+### Errors
 
 | Error | Condition |
 |---|---|
-| `NotInitialized` | Vault not initialized. |
-| `UpgradeUnauthorized` | Caller is not the admin. |
-| `StorageLayoutMismatch` | On-chain layout version ≠ `CURRENT_LAYOUT_VERSION` in new binary. |
+| `NotInitialized` | Vault not yet initialized |
+| `UpgradeUnauthorized` | Caller is not the stored admin |
+| `StorageLayoutMismatch` | On-chain `layout_version` does not equal `CURRENT_LAYOUT_VERSION` (1) |
 
-**Event emitted** (before Wasm swap, so it is always recorded)
+### Events emitted
 
 ```
 topics: ("upgrade", admin: Address)
 data:   (old_version: u32, new_version: u32)
 ```
 
-**Soroban CLI example**
+### Example
 
 ```bash
 # 1. Upload new Wasm
-HASH=$(stellar contract upload \
+NEW_HASH=$(stellar contract upload \
   --wasm target/wasm32-unknown-unknown/release/aura_vault.wasm \
-  --source <ADMIN_KEYPAIR> --network testnet)
+  --source admin-keypair \
+  --network testnet)
 
-# 2. Trigger upgrade
+# 2. Invoke upgrade
 stellar contract invoke \
-  --id <CONTRACT_ID> --source <ADMIN_KEYPAIR> --network testnet \
-  -- upgrade --new_wasm_hash "$HASH"
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-import { xdr, hash } from "@stellar/stellar-sdk";
-
-// new_wasm_hash is the 32-byte hash returned by `stellar contract upload`
-const newWasmHash = Buffer.from("<64-hex-chars>", "hex");
-await contract.call("upgrade", {
-  new_wasm_hash: newWasmHash,
-});
+  --id CONTRACT_ID \
+  --source admin-keypair \
+  --network testnet \
+  -- upgrade \
+  --new_wasm_hash "$NEW_HASH"
 ```
 
 ---
 
-## Governance
+## 18. Governance Functions
 
-The governance layer implements a multisig with a 24-hour execution timelock.
-Proposals require **3 approvals** (`REQUIRED_SIGNATURES = 3`) from the
-registered signer set before they can be executed.
+Aura Vault uses a multi-sig governance model. Changes to critical parameters (admin address, underlying token, vault parameters) require:
 
-### `propose_update_admin`
+- A proposal created by a governance **signer**.
+- **3-of-N approvals** from the signer set (`REQUIRED_SIGNATURES = 3`).
+- A **24-hour timelock** (`TIMELOCK_DURATION = 86400 seconds`) after approval before execution.
 
-Create a proposal to change the vault admin.
+### 18.1 propose_update_admin
+
+Propose changing the vault admin. Proposer must be a governance signer.
+
+#### Signature
 
 ```rust
-pub fn propose_update_admin(
+fn propose_update_admin(
     env: Env,
     proposer: Address,
     new_admin: Address,
 ) -> Result<u64, VaultError>
 ```
 
-**Parameters**: `proposer` must be in the signer set and must sign. Returns a
-`proposal_id` (`u64`).
+#### Parameters
 
-**Errors**: `InvalidAddress` if `proposer` is not a registered signer.
+| Parameter | Type | Description |
+|---|---|---|
+| `proposer` | `Address` | Must be in the governance signer list; must authorize |
+| `new_admin` | `Address` | The proposed new admin address |
 
-### `propose_update_token`
+#### Returns
 
-Create a proposal to change the underlying token.
+`Ok(proposal_id)` — the numeric ID of the created proposal.
+
+#### Errors
+
+| Error | Condition |
+|---|---|
+| `InvalidAddress` | `proposer` is not in the signer list |
+
+#### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source signer1-keypair \
+  --network testnet \
+  -- propose_update_admin \
+  --proposer GSIGNER1_ADDRESS \
+  --new_admin GNEW_ADMIN_ADDRESS
+```
+
+---
+
+### 18.2 propose_update_token
+
+Propose changing the underlying token. Proposer must be a governance signer.
+
+#### Signature
 
 ```rust
-pub fn propose_update_token(
+fn propose_update_token(
     env: Env,
     proposer: Address,
     new_token: Address,
 ) -> Result<u64, VaultError>
 ```
 
-### `propose_parameter_update`
+#### Parameters
 
-Create a proposal to update a named numeric parameter.
+| Parameter | Type | Description |
+|---|---|---|
+| `proposer` | `Address` | Must be in the governance signer list; must authorize |
+| `new_token` | `Address` | The proposed new underlying token contract address |
+
+#### Returns
+
+`Ok(proposal_id)`
+
+#### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source signer1-keypair \
+  --network testnet \
+  -- propose_update_token \
+  --proposer GSIGNER1_ADDRESS \
+  --new_token GNEW_TOKEN_ADDRESS
+```
+
+---
+
+### 18.3 propose_parameter_update
+
+Propose updating a named vault parameter. Proposer must be a governance signer.
+
+#### Signature
 
 ```rust
-pub fn propose_parameter_update(
+fn propose_parameter_update(
     env: Env,
     proposer: Address,
     name: Symbol,
@@ -662,12 +994,41 @@ pub fn propose_parameter_update(
 ) -> Result<u64, VaultError>
 ```
 
-### `vote`
+#### Parameters
 
-Cast a vote on an open proposal. Each signer may vote exactly once.
+| Parameter | Type | Description |
+|---|---|---|
+| `proposer` | `Address` | Must be in the governance signer list; must authorize |
+| `name` | `Symbol` | Name of the parameter to update (e.g., `"perf_fee_bps"`) |
+| `value` | `i128` | Proposed new value for the parameter |
+
+#### Returns
+
+`Ok(proposal_id)`
+
+#### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source signer1-keypair \
+  --network testnet \
+  -- propose_parameter_update \
+  --proposer GSIGNER1_ADDRESS \
+  --name perf_fee_bps \
+  --value 500
+```
+
+---
+
+### 18.4 vote
+
+Cast a vote on a pending proposal. Voter must be a governance signer and must not have already voted on this proposal.
+
+#### Signature
 
 ```rust
-pub fn vote(
+fn vote(
     env: Env,
     voter: Address,
     proposal_id: u64,
@@ -675,239 +1036,174 @@ pub fn vote(
 ) -> Result<(), VaultError>
 ```
 
-**Parameters**
+#### Parameters
 
-| Name | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `voter` | `Address` | Must be a registered signer; must sign the transaction. |
-| `proposal_id` | `u64` | ID returned by the relevant `propose_*` call. |
-| `approve` | `bool` | `true` to approve, `false` to reject. |
+| `voter` | `Address` | Must be in the governance signer list; must authorize |
+| `proposal_id` | `u64` | ID of the proposal to vote on |
+| `approve` | `bool` | `true` to vote in favor, `false` to vote against |
 
-**Example (JavaScript SDK)**
+#### Returns
 
-```ts
-// 200 bps = 2% performance fee, 50 bps = 0.5% management fee
-await contract.call("set_fees", {
-  perf_fee_bps: 200,
-  mgmt_fee_bps: 50,
-});
+`Ok(())`. If the proposal accumulates ≥ 3 approvals, its status changes to `Approved`.
+
+#### Errors
+
+| Error | Condition |
+|---|---|
+| `InvalidAddress` | Voter is not a signer, or has already voted |
+| `NotInitialized` | Proposal ID does not exist |
+
+#### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --source signer2-keypair \
+  --network testnet \
+  -- vote \
+  --voter GSIGNER2_ADDRESS \
+  --proposal_id 1 \
+  --approve true
 ```
 
 ---
 
-### `set_treasury`
+### 18.5 execute
 
-### `execute`
+Execute an approved proposal after the timelock has expired. Any account can call execute (it is permissionless once the proposal is approved and the timelock passed).
 
-Execute an approved proposal after the 24-hour timelock has expired.
+#### Signature
 
 ```rust
-pub fn execute(
+fn execute(
     env: Env,
     executor: Address,
     proposal_id: u64,
 ) -> Result<(), VaultError>
 ```
 
-**Example (JavaScript SDK)**
+#### Parameters
 
-```ts
-await contract.call("set_treasury", {
-  treasury: treasuryKeypair.publicKey(),
-});
-```
+| Parameter | Type | Description |
+|---|---|---|
+| `executor` | `Address` | The account executing the proposal; must authorize |
+| `proposal_id` | `u64` | ID of the approved proposal to execute |
 
----
+#### Returns
 
-### `get_fees`
+`Ok(())`. Proposal status changes to `Executed`.
 
-### `proposal_status`
+#### Errors
 
-Read the current status of a proposal. Returns `None` for unknown IDs.
+| Error | Condition |
+|---|---|
+| `InvalidAddress` | Proposal is not in `Approved` state, or timelock has not expired |
+| `NotInitialized` | Proposal ID does not exist |
 
-```rust
-pub fn proposal_status(env: Env, proposal_id: u64) -> Option<String>
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("get_fees", {});
-const [perfFeeBps, mgmtFeeBps]: [number, number] = result.value;
-// e.g. [200, 50]
-```
-
----
-
-### `total_fees_collected`
-
-**Soroban CLI example**
+#### Example
 
 ```bash
 stellar contract invoke \
-  --id <CONTRACT_ID> --network testnet \
-  -- proposal_status --proposal_id 1
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("total_fees_collected", {});
-const fees: bigint = result.value; // i128 as BigInt
-```
-
----
-
-## Events
-
-All events are emitted via `env.events().publish(topics, data)`.
-Topics are indexed and can be queried via Horizon or a Soroban event stream.
-
-| Topic symbol | Emitting function | Data |
-|---|---|---|
-| `deposit` | `deposit` | `(shares: i128, total_shares: i128, total_deposited: i128)` |
-| `withdraw` | `withdraw` | `(redeemed: i128, total_shares: i128, total_deposited: i128)` |
-| `harvest` | `harvest` | `(net_yield: i128, fee: i128, total_deposited: i128)` |
-| `harvest_token` | `harvest_token` | `(yield_amount: i128, net_underlying: i128, fee: i128)` |
-| `paused` | `pause` | _(none)_ |
-| `unpaused` | `unpause` | _(none)_ |
-| `upgrade` | `upgrade` | `(old_version: u32, new_version: u32)` |
-| `fees_withdrawn` | `withdraw_fees` | `(amount: i128, treasury: Address)` |
-| `yield_token_registered` | `register_yield_token` | `(alt_token: Address)` |
-| `suspicious` | `deposit` / `withdraw` / `harvest` | `("balance_mismatch", observed: i128, tracked: i128)` |
-
-**Filtering events (JavaScript)**
-
-```ts
-const events = await server.getEvents({
-  startLedger: fromLedger,
-  filters: [{ type: "contract", contractIds: [CONTRACT_ID], topics: [["deposit"]] }],
-});
-```
-
-**Example (JavaScript SDK)**
-
-```ts
-const result = await contract.call("withdraw_fees", {});
-const transferred: bigint = result.value; // tokens sent to treasury
-```
-
----
-
-## Error Codes
-
-Soroban surfaces these as `Error(Contract, #N)` in simulation results and
-transaction meta.
-
-| Code | Variant | Trigger |
-|---|---|---|
-| 1 | `NotInitialized` | Vault not yet initialized. |
-| 2 | `AlreadyInitialized` | `initialize` called more than once. |
-| 3 | `InsufficientShares` | Withdraw exceeds caller's share balance. |
-| 4 | `InsufficientUnderlying` | Vault cannot cover the redemption. |
-| 5 | `ZeroAmount` | Zero/negative input, or share mint rounds to zero. |
-| 6 | `MathOverflow` | Arithmetic overflow in share formula. |
-| 7 | `InvalidAddress` | Not a signer / already voted / token not whitelisted / timelock active. |
-| 8 | `ZeroShares` | `harvest` called when `total_shares == 0`. |
-| 9 | `UpgradeUnauthorized` | Caller is not the admin. |
-| 10 | `StorageLayoutMismatch` | Layout version mismatch on upgrade. |
-| 11 | `VaultPaused` | Mutating operation called while vault is paused. |
-| 12 | `BalanceMismatch` | Actual token balance ≠ tracked state (flash-loan guard). |
-
-The UI helper in `ui/src/lib/errors.ts` maps every code to a user-facing message.
-
----
-
-## Security Model
-
-| Property | Implementation |
-|---|---|
-| Checks-Effects-Interactions (CEI) | State is written before every token transfer. |
-| Flash-loan guard | `actual_balance == total_deposited` checked at the start of every mutating function; mismatch emits `suspicious` and returns `BalanceMismatch`. |
-| Inflation attack prevention | Zero-share mint rejected with `ZeroAmount`. |
-| Overflow safety | All arithmetic uses `checked_mul` / `checked_div` / `checked_add` / `checked_sub`; `overflow-checks = true` in the release profile. |
-| No panics in production | No `unwrap()` / `expect()` outside `#[cfg(test)]`; all fallible paths return typed `VaultError`. |
-| Archival safety | `bump_instance` called on every mutating function (30-day lifetime, 7-day bump threshold). |
-| Emergency stop | Admin can `pause()` to halt all mutating operations at any time. |
-| Multisig governance | Sensitive parameter changes require 3-of-N signer approval + 24-hour timelock. |
-| Upgrade guard | Layout version verified before Wasm swap; event emitted before swap so it is always recorded. |
-
----
-
-## Resource Notes
-
-Soroban charges fees in **stroops** (1 XLM = 10,000,000 stroops) based on CPU
-instructions, memory, ledger reads/writes, and network bandwidth consumed per
-transaction.  The table below gives approximate ranges observed on Testnet; mainnet
-fees scale with ledger state and network congestion.
-
-### Approximate Fee Table
-
-| Function | Ledger entries read | Ledger entries written | Typical fee (stroops) | Notes |
-|---|---|---|---|---|
-| `initialize` | 0 | 3 (admin, token, version) | ~500,000 | One-time cost |
-| `deposit` | 3 | 4 (balance, total_shares, total_deposited, TTL) | ~800,000–1,200,000 | Scales slightly with share arithmetic |
-| `withdraw` | 4 | 4 | ~900,000–1,300,000 | Similar to deposit |
-| `harvest` | 3 | 2 (total_deposited, TTL) | ~700,000–1,000,000 | No balance key write for caller |
-| `pause` / `unpause` | 1 | 1 | ~300,000 | Minimal state change |
-| `is_paused` | 1 | 0 | ~50,000 | Simulation only — no ledger write |
-| `total_assets` | 1 | 0 | ~50,000 | Simulation only |
-| `balance_of` | 1 | 0 | ~50,000 | Simulation only |
-| `transfer_admin` | 1 | 1 | ~300,000 | — |
-| `upgrade` | 2 | 2 + Wasm upload | ~2,000,000–5,000,000 | Plan during low-traffic windows |
-| `version` | 1 | 0 | ~50,000 | Simulation only |
-| `set_fees` | 1 | 1 | ~300,000 | — |
-| `set_treasury` | 1 | 1 | ~300,000 | — |
-| `get_fees` | 1 | 0 | ~50,000 | Simulation only |
-| `total_fees_collected` | 1 | 0 | ~50,000 | Simulation only |
-| `withdraw_fees` | 3 | 2 | ~700,000 | Includes token transfer |
-
-> **How to get exact fees:** Use `stellar contract simulate` before submitting any
-> transaction.  The simulator returns the exact resource cost breakdown.
-
-```bash
-stellar contract simulate \
-  --id <CONTRACT_ID> \
-  --source <KEYPAIR> \
+  --id CONTRACT_ID \
+  --source executor-keypair \
   --network testnet \
-  -- deposit \
-  --caller GUSER... \
-  --amount 1000000
-# Output includes: cpu_insns, mem_bytes, ledger_reads, ledger_writes, min_resource_fee
+  -- execute \
+  --executor GEXECUTOR_ADDRESS \
+  --proposal_id 1
 ```
-
-### TTL / Archival Costs
-
-Every mutating function calls `bump_instance` (30-day lifetime, 7-day threshold)
-and `bump_persistent` on the caller's balance key.  If an entry has already been
-bumped within the threshold window Soroban skips the write, so the actual ledger
-write count may be lower than the table shows under normal usage.
-
-Under high-frequency load (many deposits/withdrawals per ledger) the two bump
-operations per call become the dominant cost driver.  If you are building an
-automated keeper or batching tool, consider tracking the last-bumped ledger and
-skipping voluntary bumps when the entry is already near its maximum TTL.
 
 ---
 
-## Soroban Natspec Note
+### 18.6 proposal_status
 
-Soroban is a Rust (`no_std`) environment — there is no Solidity or EVM ABI.
-This document **is** the canonical API reference for `AuraVault`.
+Read-only. Returns the current status of a proposal as a human-readable string.
 
-The Rust source uses standard `///` doc-comments on every public function and
-type.  To view them locally:
+#### Signature
 
-```bash
-cd aura-vault
-cargo doc --open
+```rust
+fn proposal_status(env: Env, proposal_id: u64) -> Option<String>
 ```
 
-This generates an HTML reference in `target/doc/aura_vault/`.  The content
-mirrors the signatures and parameter tables in this document, but the HTML view
-includes cross-links to internal types and trait implementations.
+#### Returns
 
-> **For Solidity/EVM developers:** think of Soroban `#[contractimpl]` as the
-> equivalent of a Solidity contract's public ABI, and `VaultError` variants as
-> the equivalent of `revert` reasons.  There is no ABI JSON file — the interface
-> is defined by `aura-vault/src/interface.rs` (`AuraVaultTrait`).
+One of: `"Pending"`, `"Approved"`, `"Executed"`, `"Rejected"`. Returns `None` if the proposal ID does not exist.
+
+#### Example
+
+```bash
+stellar contract invoke \
+  --id CONTRACT_ID \
+  --network testnet \
+  -- proposal_status \
+  --proposal_id 1
+```
+
+---
+
+## 19. Events Reference
+
+The following table lists all events emitted by the contract with their topics and data payloads.
+
+| Event name | Emitted by | Topics | Data |
+|---|---|---|---|
+| `deposit` | `deposit` | `("deposit", caller, amount)` | `(new_shares, new_total_shares, new_total_deposited)` |
+| `withdraw` | `withdraw` | `("withdraw", caller, shares)` | `(redeem_amount, new_total_shares, new_total_deposited)` |
+| `harvest` | `harvest` | `("harvest", caller, yield_amount)` | `(yield_net, fee_amount, new_total_assets)` |
+| `harvest_token` | `harvest_token` | `("harvest_token", caller, alt_token)` | `(yield_amount, net_underlying, fee_amount)` |
+| `yield_token_registered` | `register_yield_token` | `("yield_token_registered",)` | `(alt_token,)` |
+| `paused` | `pause` | `("paused",)` | `()` |
+| `unpaused` | `unpause` | `("unpaused",)` | `()` |
+| `fees_withdrawn` | `withdraw_fees` | `("fees_withdrawn", admin)` | `(fees, treasury)` |
+| `upgrade` | `upgrade` | `("upgrade", admin)` | `(old_version, new_version)` |
+| `suspicious` | `deposit`/`withdraw`/`harvest` | `("suspicious",)` | `("balance_mismatch", actual_balance, tracked_deposited)` |
+
+Topics are indexed on-chain for efficient filtering by event name, caller, or amount. Data fields are contextual payloads included in the event body.
+
+---
+
+## 20. Storage Layout
+
+| Key | Storage type | Type | Description |
+|---|---|---|---|
+| `Admin` | Instance | `Address` | Vault admin |
+| `UnderlyingToken` | Instance | `Address` | Underlying token contract |
+| `TotalShares` | Instance | `i128` | Outstanding shares |
+| `TotalDeposited` | Instance | `i128` | Net tracked underlying tokens |
+| `Version` | Instance | `u32` | Contract version counter (incremented on upgrade) |
+| `LayoutVersion` | Instance | `u32` | Storage layout version (must equal `CURRENT_LAYOUT_VERSION = 1`) |
+| `Paused` | Instance | `bool` | Emergency pause flag |
+| `Treasury` | Instance | `Address` | Fee destination |
+| `PerfFeeBps` | Instance | `u32` | Performance fee rate (default: 1000) |
+| `MgmtFeeBps` | Instance | `u32` | Management fee rate (default: 0) |
+| `TotalFeeCollected` | Instance | `i128` | Accumulated unwithdrawn fees |
+| `LastMgmtFeeTime` | Instance | `u64` | Last management fee timestamp (reserved) |
+| `YieldToken(addr)` | Instance | `bool` | Yield token whitelist |
+| `Balance(addr)` | Persistent | `i128` | Per-user share balance |
+| `Decimals` | Instance | `u32` | Number of decimal places used by vault shares (immutable; default: 7) |
+| `ReentrancyGuard` | Instance | `bool` | Transient lock preventing reentrant contract calls (cleared on exit) |
+
+**TTL constants:**  
+- Instance and persistent storage: 30-day bump amount (517,200 ledgers), 7-day threshold (120,960 ledgers).
+- Every mutating call bumps the instance TTL. `deposit` and `withdraw` also bump the caller's persistent balance entry.
+
+---
+
+## 21. Reentrancy Protection (Defence-in-Depth)
+
+Although Soroban's single-invocation execution model provides strong baseline protection against classical EVM reentrancy, AuraVault implements an explicit reentrancy lock on all state-mutating functions for **defence-in-depth**:
+
+1. On entry, `DataKey::ReentrancyGuard` is checked; if `true`, call reverts with `VaultError::Reentrancy` (code 30).
+2. `DataKey::ReentrancyGuard` is set to `true`.
+3. The function body executes.
+4. On exit (including error paths), `DataKey::ReentrancyGuard` is reset to `false`.
+
+### Gas Overhead
+The reentrancy guard adds approximately:
+- **~1,850 CPU instructions** per mutating call (1 storage read + 2 instance storage writes).
+- Negligible ledger footprint since `ReentrancyGuard` is stored in the already-accessed instance storage map.
+
+---
+
+*Issues: [#345](https://github.com/soterika/aura-vault-protocol/issues/345), [#347](https://github.com/soterika/aura-vault-protocol/issues/347), [#385](https://github.com/soterika/aura-vault-protocol/issues/385)*
