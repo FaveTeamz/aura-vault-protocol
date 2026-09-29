@@ -110,7 +110,8 @@ use storage::{
     get_vault_name, set_vault_name, get_vault_symbol, set_vault_symbol, get_vault_version, set_vault_version,
     get_decimals, set_decimals,
     enter_reentrancy_guard, exit_reentrancy_guard, is_reentrancy_locked,
-};use governance::{
+};
+use governance::{
     initialize_governance, create_proposal, vote_on_proposal, execute_proposal,
     get_proposal_status, ProposalStatus, ProposalType,
 };
@@ -128,6 +129,17 @@ pub const YIELD_PRECISION: i128 = 1_000_000_000_000;
 
 /// Maximum withdrawal fee in basis points (5%).
 pub const MAX_WITHDRAWAL_FEE_BPS: u32 = 500;
+pub const ROLE_ADMIN: u32 = storage::ADMIN_ROLE;
+pub const ROLE_KEEPER: u32 = storage::KEEPER_ROLE;
+pub const ROLE_GUARDIAN: u32 = storage::GUARDIAN_ROLE;
+
+fn has_role(env: &Env, addr: &Address, role_mask: u32) -> bool {
+    storage::has_role(env, addr, role_mask)
+}
+
+fn set_role_mask(env: &Env, addr: &Address, mask: u32) {
+    storage::set_role_mask(env, addr, mask)
+}
 
 // ---------------------------------------------------------------------------
 // Module-level helpers (non-contract functions)
@@ -1691,6 +1703,137 @@ impl AuraVault {
     /// Read-only view; no authorisation required.
     pub fn is_paused(env: Env) -> bool {
         storage_is_paused(&env)
+    }
+
+    /// Return the pending admin address, if one exists.
+    pub fn pending_admin(env: Env) -> Option<Address> {
+        let pending = storage::get_pending_admin(&env)?;
+        if env.ledger().timestamp() > storage::get_pending_admin_expiry(&env) {
+            None
+        } else {
+            Some(pending)
+        }
+    }
+
+    /// Propose a new admin address. The current admin must authorize the call.
+    pub fn propose_admin(env: Env, current_admin: Address, new_admin: Address) -> Result<(), VaultError> {
+        with_reentrancy_guard(&env, || {
+            let stored_admin = get_admin(&env).ok_or(VaultError::NotInitialized)?;
+            if stored_admin != current_admin {
+                return Err(VaultError::UpgradeUnauthorized);
+            }
+            current_admin.require_auth();
+            let expires_at = env.ledger().timestamp().saturating_add(48 * 60 * 60);
+            storage::set_pending_admin(&env, &new_admin);
+            storage::set_pending_admin_expiry(&env, expires_at);
+            env.events().publish(
+                (Symbol::new(&env, "AdminProposed"), current_admin),
+                (new_admin, expires_at),
+            );
+            bump_instance(&env);
+            Ok(())
+        })
+    }
+
+    /// Accept the pending admin transfer. The pending admin must authorize the call.
+    pub fn accept_admin(env: Env, new_admin: Address) -> Result<(), VaultError> {
+        with_reentrancy_guard(&env, || {
+            let pending = storage::get_pending_admin(&env).ok_or(VaultError::NoPendingAdmin)?;
+            let expiry = storage::get_pending_admin_expiry(&env);
+            let now = env.ledger().timestamp();
+            if pending != new_admin {
+                return Err(VaultError::UpgradeUnauthorized);
+            }
+            if now > expiry {
+                storage::clear_pending_admin(&env);
+                storage::clear_pending_admin_expiry(&env);
+                return Err(VaultError::PendingAdminExpired);
+            }
+            new_admin.require_auth();
+            let old_admin = get_admin(&env).ok_or(VaultError::NotInitialized)?;
+            let old_admin_roles = storage::get_role_mask(&env, &old_admin) & !ROLE_ADMIN;
+            let new_admin_roles = storage::get_role_mask(&env, &new_admin) | ROLE_ADMIN;
+            set_admin(&env, &new_admin);
+            set_role_mask(&env, &old_admin, old_admin_roles);
+            set_role_mask(&env, &new_admin, new_admin_roles);
+            storage::clear_pending_admin(&env);
+            storage::clear_pending_admin_expiry(&env);
+            env.events().publish(
+                (Symbol::new(&env, "AdminTransferred"), old_admin),
+                (new_admin,),
+            );
+            bump_instance(&env);
+            Ok(())
+        })
+    }
+
+    /// Cancel a pending admin transfer. The current admin must authorize the call.
+    pub fn cancel_admin(env: Env, current_admin: Address) -> Result<(), VaultError> {
+        with_reentrancy_guard(&env, || {
+            let stored_admin = get_admin(&env).ok_or(VaultError::NotInitialized)?;
+            if stored_admin != current_admin {
+                return Err(VaultError::UpgradeUnauthorized);
+            }
+            if storage::get_pending_admin(&env).is_none() {
+                return Err(VaultError::NoPendingAdmin);
+            }
+            current_admin.require_auth();
+            storage::clear_pending_admin(&env);
+            storage::clear_pending_admin_expiry(&env);
+            env.events().publish((Symbol::new(&env, "AdminCancelled"), current_admin), ());
+            bump_instance(&env);
+            Ok(())
+        })
+    }
+
+    /// Return the role bitmask for an address.
+    pub fn get_roles(env: Env, addr: Address) -> u32 {
+        storage::get_role_mask(&env, &addr)
+    }
+
+    /// Return `true` if the address holds all bits in `role_mask`.
+    pub fn has_role_query(env: Env, addr: Address, role_mask: u32) -> bool {
+        storage::has_role(&env, &addr, role_mask)
+    }
+
+    /// Grant a role to an address. Admin-only.
+    pub fn grant_role(env: Env, admin: Address, role: u32, addr: Address) -> Result<(), VaultError> {
+        with_reentrancy_guard(&env, || {
+            let stored_admin = get_admin(&env).ok_or(VaultError::NotInitialized)?;
+            if stored_admin != admin {
+                return Err(VaultError::UpgradeUnauthorized);
+            }
+            admin.require_auth();
+            let mut mask = storage::get_role_mask(&env, &addr);
+            mask |= role;
+            storage::set_role_mask(&env, &addr, mask);
+            env.events().publish(
+                (Symbol::new(&env, "RoleGranted"), admin),
+                (role, addr),
+            );
+            bump_instance(&env);
+            Ok(())
+        })
+    }
+
+    /// Revoke a role from an address. Admin-only.
+    pub fn revoke_role(env: Env, admin: Address, role: u32, addr: Address) -> Result<(), VaultError> {
+        with_reentrancy_guard(&env, || {
+            let stored_admin = get_admin(&env).ok_or(VaultError::NotInitialized)?;
+            if stored_admin != admin {
+                return Err(VaultError::UpgradeUnauthorized);
+            }
+            admin.require_auth();
+            let mut mask = storage::get_role_mask(&env, &addr);
+            mask &= !role;
+            storage::set_role_mask(&env, &addr, mask);
+            env.events().publish(
+                (Symbol::new(&env, "RoleRevoked"), admin),
+                (role, addr),
+            );
+            bump_instance(&env);
+            Ok(())
+        })
     }
 
     // -----------------------------------------------------------------------
