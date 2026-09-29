@@ -95,6 +95,12 @@ pub enum DataKey {
     MultiSigOpCount,
     /// Per-signer vote record — prevents double-signing. Tuple: (op_id, signer).
     MultiSigVote(u64, Address),
+    /// Per-address role bitmask used by admin/keeper/guardian checks.
+    Role(Address),
+    /// Pending admin nominated for a two-step transfer.
+    PendingAdmin,
+    /// Unix timestamp at which a pending admin transfer expires.
+    PendingAdminExpiry,
 }
 
 pub const ADMIN_ROLE: u32 = 1 << 0;
@@ -628,6 +634,47 @@ pub fn set_multisig_op_count(env: &Env, count: u64) {
     env.storage()
         .instance()
         .set(&DataKey::MultiSigOpCount, &count);
+}
+
+pub fn get_role_mask(env: &Env, addr: &Address) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::Role(addr.clone()))
+        .unwrap_or(0)
+}
+
+pub fn set_role_mask(env: &Env, addr: &Address, mask: u32) {
+    env.storage().persistent().set(&DataKey::Role(addr.clone()), &mask);
+    let key = DataKey::Role(addr.clone());
+    env.storage().persistent().extend_ttl(&key, PERSISTENT_LIFETIME_THRESHOLD, PERSISTENT_BUMP_AMOUNT);
+}
+
+pub fn has_role(env: &Env, addr: &Address, role: u32) -> bool {
+    (get_role_mask(env, addr) & role) == role
+}
+
+pub fn get_pending_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::PendingAdmin)
+}
+
+pub fn set_pending_admin(env: &Env, addr: &Address) {
+    env.storage().instance().set(&DataKey::PendingAdmin, addr);
+}
+
+pub fn clear_pending_admin(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingAdmin);
+}
+
+pub fn get_pending_admin_expiry(env: &Env) -> u64 {
+    env.storage().instance().get(&DataKey::PendingAdminExpiry).unwrap_or(0)
+}
+
+pub fn set_pending_admin_expiry(env: &Env, expiry: u64) {
+    env.storage().instance().set(&DataKey::PendingAdminExpiry, &expiry);
+}
+
+pub fn clear_pending_admin_expiry(env: &Env) {
+    env.storage().instance().remove(&DataKey::PendingAdminExpiry);
 }
 
 pub fn has_multisig_signed(env: &Env, op_id: u64, signer: &Address) -> bool {

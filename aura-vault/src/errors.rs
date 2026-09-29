@@ -267,6 +267,28 @@ pub enum VaultError {
     BelowMinDeposit        = 29,
     /// A reentrant call was detected and blocked by the reentrancy guard. Issue #345.
     Reentrancy             = 30,
+    /// No admin transfer is currently pending.
+    NoPendingAdmin         = 31,
+    /// The pending admin transfer expired before acceptance.
+    PendingAdminExpired    = 32,
+    /// The caller does not satisfy the role requirement for this operation.
+    Unauthorized           = 33,
+    /// Circuit-breaker protection tripped during price movement validation.
+    CircuitBreakerTripped  = 34,
+    /// The caller is not a registered signatory for the requested governance action.
+    NotASigner             = 35,
+    /// Multi-sig operation does not exist.
+    OperationNotFound      = 36,
+    /// The requested operation has already been executed.
+    OperationAlreadyExecuted = 37,
+    /// The requested operation has expired before execution.
+    OperationExpired       = 38,
+    /// The signer has already signed this operation.
+    OperationAlreadySigned = 39,
+    /// The operation is still pending, and the threshold has not been met.
+    ThresholdNotMet        = 40,
+    /// The provided signer threshold is invalid for the current signer set.
+    InvalidThreshold       = 41,
 }
 
 impl VaultError {
@@ -303,6 +325,17 @@ impl VaultError {
             VaultError::NotWhitelisted => "Caller is not whitelisted for deposit",
             VaultError::BelowMinDeposit => "Deposit amount is below minimum deposit threshold",
             VaultError::Reentrancy => "Reentrancy detected: contract call is not reentrant",
+            VaultError::NoPendingAdmin => "No pending admin transfer exists",
+            VaultError::PendingAdminExpired => "Pending admin transfer has expired",
+            VaultError::Unauthorized => "Caller does not hold the required role",
+            VaultError::CircuitBreakerTripped => "Price movement exceeded the circuit breaker limit",
+            VaultError::NotASigner => "Caller is not a registered signer",
+            VaultError::OperationNotFound => "Multi-sig operation not found",
+            VaultError::OperationAlreadyExecuted => "Multi-sig operation was already executed",
+            VaultError::OperationExpired => "Multi-sig operation has expired",
+            VaultError::OperationAlreadySigned => "Signer has already signed this operation",
+            VaultError::ThresholdNotMet => "Operation signature threshold has not been met",
+            VaultError::InvalidThreshold => "Invalid multi-sig threshold",
         }
     }
 }
