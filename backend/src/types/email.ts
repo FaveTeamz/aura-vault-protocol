@@ -3,7 +3,10 @@ export type EmailTemplate =
   | 'deposit'
   | 'withdrawal'
   | 'security-alert'
-  | 'welcome';
+  | 'welcome'
+  | 'gdpr-erasure-confirmation'
+  | 'gdpr-data-export-ready'
+  | 'portfolio-digest';
 
 export type EmailPriority = 'high' | 'normal' | 'low';
 export type EmailProvider = 'sendgrid' | 'mailgun';

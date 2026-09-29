@@ -31,3 +31,18 @@ provider "aws" {
     }
   }
 }
+
+# Provider alias for S3 cross-region replication destination (us-west-2)
+# Used by terraform/s3-backup.tf for the replica bucket — Issue #961
+provider "aws" {
+  alias  = "replica"
+  region = "us-west-2"
+
+  default_tags {
+    tags = {
+      Project     = "aura-vault-protocol"
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
