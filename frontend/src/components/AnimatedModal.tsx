@@ -16,6 +16,8 @@ export function AnimatedModal({
   children,
 }: AnimatedModalProps) {
   useEffect(() => {
+    if (typeof document === "undefined") return;
+
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -31,8 +33,10 @@ export function AnimatedModal({
     }
 
     return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "";
+      if (typeof document !== "undefined") {
+        document.removeEventListener("keydown", handleEscape);
+        document.body.style.overflow = "";
+      }
     };
   }, [isOpen, onClose]);
 

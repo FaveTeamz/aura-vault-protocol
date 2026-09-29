@@ -7,9 +7,11 @@ import { useInlineLiveRegion } from "./LiveRegion";
 
 interface Props {
   onToast: (msg: ToastMessage) => void;
+  /** Connected wallet address — null when no wallet is connected. */
+  walletAddress: string | null;
 }
 
-export function WithdrawForm({ onToast }: Props) {
+export function WithdrawForm({ onToast, walletAddress }: Props) {
   const id = useId();
   const [shares, setShares] = useState("");
   const [fieldError, setFieldError] = useState("");
@@ -18,8 +20,12 @@ export function WithdrawForm({ onToast }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { announce, regionProps } = useInlineLiveRegion("polite");
 
+  // useUserPosition is keyed by wallet address; null address is a no-op.
+  const { data: position, revalidate } = useUserPosition(walletAddress);
+
   const validate = (val: string) => {
-    if (!val || isNaN(Number(val)) || Number(val) <= 0) return "Enter a valid share amount greater than 0.";
+    if (!val || isNaN(Number(val)) || Number(val) <= 0)
+      return "Enter a valid share amount greater than 0.";
     return "";
   };
 
@@ -28,7 +34,7 @@ export function WithdrawForm({ onToast }: Props) {
     setLoading(true);
     announce("Processing withdrawal, please wait.");
     try {
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 100));
       setShares("");
       announce(`Withdrew ${shares} shares successfully.`);
       onToast({ type: "success", text: `Withdrew ${shares} shares successfully.` });
@@ -65,20 +71,21 @@ export function WithdrawForm({ onToast }: Props) {
           <div className="field">
             <label htmlFor={`${id}-shares`}>Shares</label>
             <input
-              ref={inputRef}
-              id={`${id}-shares`}
-              type="number"
-              min="0"
-              step="any"
-              value={shares}
-              onChange={(e) => { setShares(e.target.value); if (fieldError) setFieldError(""); }}
-              aria-describedby={fieldError ? `${id}-err` : `${id}-hint`}
-              aria-invalid={!!fieldError}
-              aria-required="true"
-              placeholder="0.00"
-              className="input"
-              autoComplete="off"
-            />
+  ref={inputRef}
+  id={`${id}-shares`}
+  type="number"
+  min="0"
+  step="any"
+  value={shares}
+  onChange={(e) => { setShares(e.target.value); if (fieldError) setFieldError(""); }}
+  aria-label="Shares"
+  aria-describedby={fieldError ? `${id}-err` : `${id}-hint`}
+  aria-invalid={!!fieldError}
+  aria-required="true"
+  placeholder="0.00"
+  className="input"
+  autoComplete="off"
+/>
             <p id={`${id}-hint`} className="field-hint" aria-hidden={!!fieldError}>
               Enter the number of vault shares to redeem for underlying tokens.
             </p>

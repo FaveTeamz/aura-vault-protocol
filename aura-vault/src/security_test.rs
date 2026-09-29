@@ -30,7 +30,7 @@ mod security_tests {
         let vault_addr = env.register_contract(None, AuraVault);
         let vault = AuraVaultClient::new(&env, &vault_addr);
         let signers: Vec<Address> = Vec::new(&env);
-        vault.initialize(&admin, &token_addr, &signers);
+        vault.initialize(&admin, &token_addr, &signers, &soroban_sdk::String::from_str(&env, "AuraVault"), &soroban_sdk::String::from_str(&env, "AURA"));
         vault.set_fees(&admin, &0_u32, &0_u32);
         (env, vault, admin, token_addr)
     }
@@ -278,7 +278,7 @@ mod security_tests {
         // Attacker directly transfers tokens into the vault bypassing deposit.
         let vault_addr = env.register_contract(None, AuraVault);
         mint(&env, &token, &admin, &attacker, 1_000_000);
-        StellarAssetClient::new(&env, &token)
+        soroban_sdk::token::Client::new(&env, &token)
             .transfer(&attacker, &vault_addr, &1_000_000);
 
         // Now the real vault's balance == 0 (different contract address),
@@ -292,7 +292,7 @@ mod security_tests {
         // Inject extra tokens directly (simulating flash-loan manipulation).
         let vault2_addr = vault2.address.clone();
         mint(&env2, &token2, &admin2, &user, 100_000);
-        StellarAssetClient::new(&env2, &token2)
+        soroban_sdk::token::Client::new(&env2, &token2)
             .transfer(&user, &vault2_addr, &100_000);
 
         // Next deposit must detect the mismatch.
@@ -313,7 +313,7 @@ mod security_tests {
         // Inject extra tokens.
         let vault_addr = vault.address.clone();
         mint(&env, &token, &admin, &user, 1);
-        StellarAssetClient::new(&env, &token)
+        soroban_sdk::token::Client::new(&env, &token)
             .transfer(&user, &vault_addr, &1);
 
         let shares = vault.balance_of(&user);
@@ -332,7 +332,7 @@ mod security_tests {
         // Inject extra tokens.
         let vault_addr = vault.address.clone();
         mint(&env, &token, &admin, &user, 1);
-        StellarAssetClient::new(&env, &token)
+        soroban_sdk::token::Client::new(&env, &token)
             .transfer(&user, &vault_addr, &1);
 
         let keeper = Address::generate(&env);
@@ -355,7 +355,7 @@ mod security_tests {
         let vault_addr = vault.address.clone();
         let attacker = Address::generate(&env);
         mint(&env, &token, &admin, &attacker, 9_000_000);
-        StellarAssetClient::new(&env, &token)
+        soroban_sdk::token::Client::new(&env, &token)
             .transfer(&attacker, &vault_addr, &9_000_000);
 
         mint(&env, &token, &admin, &attacker, 100);
