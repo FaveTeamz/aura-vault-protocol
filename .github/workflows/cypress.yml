@@ -5,12 +5,13 @@ on:
     branches:
       - main
       - "feature/**"
+      - "feat/**"
   pull_request:
 
 jobs:
   cypress:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -24,7 +25,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install root deps
+      - name: Install root deps (includes cypress-axe)
         run: npm ci
 
       - name: Install frontend deps and build
@@ -45,7 +46,6 @@ jobs:
           wait-on-timeout: 60
           install: false
         env:
-          # Ensure screenshots are always captured on failure
           CYPRESS_screenshotOnRunFailure: "true"
 
       - name: Upload screenshots on failure
@@ -65,3 +65,56 @@ jobs:
           else
             echo "No screenshots directory found (no test failures produced screenshots)"
           fi
+
+  a11y:
+    name: Accessibility Audit (WCAG 2.1 AA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root deps (includes cypress-axe)
+        run: npm ci
+
+      - name: Install frontend deps and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npx next build
+
+      - name: Start frontend server
+        working-directory: frontend
+        run: npx next start &
+
+      - name: Run Accessibility Audit Tests
+        uses: cypress-io/github-action@v6
+        with:
+          browser: chrome
+          spec: "cypress/e2e/a11y.cy.ts"
+          wait-on: "http://localhost:3000"
+          wait-on-timeout: 60
+          install: false
+        env:
+          CYPRESS_screenshotOnRunFailure: "true"
+
+      - name: Upload a11y screenshots on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-a11y-screenshots
+          path: cypress/screenshots
+          if-no-files-found: ignore
+
+      - name: Fail CI on new accessibility violations
+        if: failure()
+        run: |
+          echo "Accessibility audit FAILED. New WCAG 2.1 AA violations were detected."
+          echo "Review cypress/e2e/a11y.cy.ts for documented known violations."
+          echo "Any violation not documented with an issue link must be fixed before merging."
+          exit 1

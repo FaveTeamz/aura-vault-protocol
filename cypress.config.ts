@@ -10,5 +10,14 @@ export default defineConfig({
     viewportHeight: 720,
     defaultCommandTimeout: 10000,
     supportFile: "cypress/support/e2e.ts",
+    setupNodeEvents(on) {
+      // Task: log accessibility violations to the Cypress command log and CI output
+      on("task", {
+        log(message: string) {
+          console.log(message);
+          return null;
+        },
+      });
+    },
   },
 });
