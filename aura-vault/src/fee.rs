@@ -1,9 +1,8 @@
 use crate::VaultError;
-use soroban_sdk::{Address, Env};
 
-/// Performance fee in basis points (10-20%, i.e., 1000-2000 bps)
-pub const MIN_PERF_FEE_BPS: u32 = 1000; // 10%
-pub const MAX_PERF_FEE_BPS: u32 = 2000; // 20%
+/// Performance fee in basis points (0-20%, i.e., 0-2000 bps)
+pub const MIN_PERF_FEE_BPS: u32 = 0;     // 0%
+pub const MAX_PERF_FEE_BPS: u32 = 2000;  // 20%
 
 /// Management fee in basis points annually (0-1%, i.e., 0-100 bps)
 pub const MIN_MGMT_FEE_BPS: u32 = 0; // 0%

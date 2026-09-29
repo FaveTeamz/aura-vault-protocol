@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/global.css";
+import "./styles/components.css";
+import { ThemeProvider } from "./components/ThemeProvider";
 import App from "./App";
 
-// Axe-core in dev only
 if (import.meta.env.DEV) {
   const { default: axe } = await import("@axe-core/react");
   const React = await import("react");
@@ -13,6 +14,8 @@ if (import.meta.env.DEV) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>
 );
