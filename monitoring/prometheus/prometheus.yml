@@ -4,6 +4,7 @@ global:
 
 rule_files:
   - "alert.rules.yml"
+  - "indexer-alerts.yml"
 
 alerting:
   alertmanagers:
@@ -37,3 +38,13 @@ scrape_configs:
       - targets: ["host.docker.internal:9100"]
         labels:
           service: "node-exporter"
+
+  # Scrapes event indexer metrics from the Aura Vault backend
+  - job_name: "event-indexer"
+    metrics_path: /api/v1/indexer/metrics/prometheus
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["host.docker.internal:3001"]
+        labels:
+          service: "event-indexer"
+          environment: "production"

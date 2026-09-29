@@ -83,7 +83,7 @@ function setupAutocomplete(input) {
 
     if (!matches.length) { list.hidden = true; return; }
 
-    matches.slice(0, 4).forEach((domain, i) => {
+    matches.slice(0, 4).forEach((domain) => {
       const li = document.createElement('li');
       li.textContent = user + domain;
       li.setAttribute('role', 'option');

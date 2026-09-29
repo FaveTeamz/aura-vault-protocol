@@ -3,6 +3,7 @@ import type { ToastMessage } from "./Toast";
 import { Skeleton } from "./Skeleton";
 import { ErrorMessage } from "./ErrorMessage";
 import { translateError, type UserError } from "../lib/errors";
+import { TermTooltip } from "./Tooltip";
 
 interface Props {
   onToast: (msg: ToastMessage) => void;
@@ -20,11 +21,12 @@ export function HarvestPanel({ onToast }: Props) {
     return "";
   };
 
-  const submit = useCallback(async () => {
+          const submit = useCallback(async () => {
     setTxError(null);
     setLoading(true);
+
     try {
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 100));
       setYieldAmt("");
       onToast({ type: "success", text: `Harvested ${yieldAmt} yield tokens.` });
     } catch (err) {
@@ -44,11 +46,15 @@ export function HarvestPanel({ onToast }: Props) {
 
   return (
     <section aria-labelledby={`${id}-title`} className="vault-form">
-      <h2 id={`${id}-title`} className="form-title">Harvest</h2>
-      <p className="form-desc">Inject yield into the vault for all shareholders.</p>
-      {loading ? (
-        <Skeleton rows={3} />
-      ) : (
+      <h2 id={`${id}-title`} className="form-title">
+        <TermTooltip term="Harvest" />
+      </h2>
+      <p className="form-desc">
+        As a <TermTooltip term="Keeper" />, inject yield into the vault for all shareholders.
+      </p>
+            {loading ? (
+  <Skeleton rows={3} />
+) : (
         <form onSubmit={handleSubmit} noValidate>
           <div className="field">
             <label htmlFor={`${id}-yield`}>Yield Amount</label>
