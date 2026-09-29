@@ -213,13 +213,95 @@ variable "alert_email" {
   default     = ""
 }
 
-# CloudWatch Log Group for Application Logs
+# =============================================================================
+# CloudWatch Log Groups — tiered retention for cost optimisation
+#
+# Tier          | Retention | Rationale
+# --------------|-----------|---------------------------------------------------
+# application   | 30 days   | INFO-level operational logs
+# error         | 90 days   | ERROR/WARN logs for post-incident analysis
+# security      | 365 days  | Audit / security events for compliance
+# debug         | 7 days    | DEBUG/TRACE — high volume, short-lived value
+# =============================================================================
+
+# Application logs (INFO level) — 30 days
 resource "aws_cloudwatch_log_group" "application" {
-  name              = "/aws/${var.project_name}/${var.environment}"
-  retention_in_days = 7
-  
+  name              = "/aws/${var.project_name}/${var.environment}/application"
+  retention_in_days = 30
+
   tags = {
-    Name = "${var.project_name}-application-logs-${var.environment}"
+    Name        = "${var.project_name}-application-logs-${var.environment}"
+    LogTier     = "application"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# Error logs — 90 days
+resource "aws_cloudwatch_log_group" "error" {
+  name              = "/aws/${var.project_name}/${var.environment}/error"
+  retention_in_days = 90
+
+  tags = {
+    Name        = "${var.project_name}-error-logs-${var.environment}"
+    LogTier     = "error"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# Security / audit logs — 365 days
+resource "aws_cloudwatch_log_group" "security" {
+  name              = "/aws/${var.project_name}/${var.environment}/security"
+  retention_in_days = 365
+
+  tags = {
+    Name        = "${var.project_name}-security-logs-${var.environment}"
+    LogTier     = "security"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# Debug logs — 7 days
+resource "aws_cloudwatch_log_group" "debug" {
+  name              = "/aws/${var.project_name}/${var.environment}/debug"
+  retention_in_days = 7
+
+  tags = {
+    Name        = "${var.project_name}-debug-logs-${var.environment}"
+    LogTier     = "debug"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# CloudWatch Metric Alarm — log ingestion rate budget guard
+# Triggers if total ingest bytes across all log groups exceeds threshold.
+# Adjust threshold_bytes to match your cost budget (default: ~5 GB/day ≈ 150 GB/month).
+variable "log_ingestion_budget_bytes" {
+  description = "Daily log ingestion budget in bytes. Alarm fires when exceeded."
+  type        = number
+  default     = 5368709120 # 5 GiB/day
+}
+
+resource "aws_cloudwatch_metric_alarm" "log_ingestion_budget" {
+  alarm_name          = "${var.project_name}-log-ingestion-budget-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "IncomingBytes"
+  namespace           = "AWS/Logs"
+  period              = 86400 # 24 hours
+  statistic           = "Sum"
+  threshold           = var.log_ingestion_budget_bytes
+  alarm_description   = "Daily CloudWatch log ingestion has exceeded the cost budget threshold"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.project_name}-log-ingestion-budget-${var.environment}"
+    Environment = var.environment
+    ManagedBy   = "terraform"
   }
 }
 

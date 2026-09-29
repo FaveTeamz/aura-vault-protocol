@@ -34,6 +34,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "eks_oidc_issuer_url" {
+  description = "OIDC issuer URL for the EKS cluster (used for IRSA). Format: https://oidc.eks.<region>.amazonaws.com/id/<ID>"
+  type        = string
+  default     = ""
+}
+
 variable "backend_instance_type" {
   description = "EC2 instance type for backend"
   type        = string

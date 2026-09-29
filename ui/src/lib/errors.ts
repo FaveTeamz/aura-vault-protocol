@@ -26,7 +26,30 @@ const VAULT_ERROR_MAP: Record<number, Pick<UserError, "message" | "action" | "re
   12: { message: "Unexpected token balance detected. The transaction was blocked for your protection.", action: "Wait a moment and try again. If the problem persists, contact support.", retryable: true },
 };
 
-function extractVaultCode(err: unknown): number | null {
+/**
+ * Returns a short human-readable label for a vault error code, e.g. "VaultPaused (11)".
+ * Returns null when the code is not recognised.
+ */
+export function errorCodeLabel(code: number): string | null {
+  const LABEL: Record<number, string> = {
+    1:  "NotInitialized",
+    2:  "AlreadyInitialized",
+    3:  "InsufficientShares",
+    4:  "InsufficientUnderlying",
+    5:  "ZeroAmount",
+    6:  "MathOverflow",
+    7:  "InvalidAddress",
+    8:  "ZeroShares",
+    9:  "UpgradeUnauthorized",
+    10: "StorageLayoutMismatch",
+    11: "VaultPaused",
+    12: "BalanceMismatch",
+  };
+  const name = LABEL[code];
+  return name ? `${name} (${code})` : null;
+}
+
+export function extractVaultCode(err: unknown): number | null {
   if (err && typeof err === "object") {
     // Soroban SDK typically surfaces the code as `.code` or in the message
     const code = (err as Record<string, unknown>).code;
@@ -122,3 +145,39 @@ export function translateError(err: unknown): UserError {
     _raw: err,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Sentry integration stub
+// ---------------------------------------------------------------------------
+
+export interface SentryCaptureContext {
+  /** Stellar/Soroban wallet public key — attached as tag for issue grouping */
+  walletAddress?: string;
+  /** Which panel threw (deposit | withdraw | harvest) */
+  panelName?: string;
+  /** Resolved vault error code, if any */
+  errorCode?: number | null;
+}
+
+/**
+ * Thin Sentry wrapper.
+ *
+ * In production, replace the body with a real `@sentry/browser` import:
+ *
+ *   import * as Sentry from "@sentry/browser";
+ *   Sentry.captureException(error, { tags: { walletAddress, errorCode, panelName } });
+ *
+ * The stub is kept here so the rest of the UI can import and call it unconditionally
+ * without pulling in the full Sentry SDK unless the team decides to add it.
+ */
+export const SentryClient = {
+  captureContractError(error: unknown, ctx: SentryCaptureContext = {}): void {
+    // Real implementation would call Sentry.captureException() here.
+    // The stub is intentionally a no-op so it is safe to call in tests and
+    // in environments where Sentry has not been initialised.
+    if (typeof (globalThis as Record<string, unknown>).__SENTRY_CAPTURE__ === "function") {
+      // Allow tests / host apps to inject a spy via globalThis.__SENTRY_CAPTURE__
+      (globalThis as Record<string, unknown>).__SENTRY_CAPTURE__(error, ctx);
+    }
+  },
+};

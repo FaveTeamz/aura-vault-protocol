@@ -29,5 +29,21 @@ export default defineConfig({
         launchOptions: { args: ["--disable-extensions"] },
       },
     },
+    // Visual regression — chromium only for deterministic rendering
+    {
+      name: "visual-regression",
+      testMatch: "**/visual-regression.spec.ts",
+      snapshotDir: "./playwright/snapshots",
+      use: {
+        ...devices["Desktop Chrome"],
+        // Disable animations for pixel-stable screenshots
+        launchOptions: {
+          args: [
+            "--disable-extensions",
+            "--force-prefers-reduced-motion",
+          ],
+        },
+      },
+    },
   ],
 });

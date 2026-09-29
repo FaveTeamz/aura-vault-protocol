@@ -20,7 +20,7 @@ jobs:
         working-directory: aura-vault
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -45,7 +45,7 @@ jobs:
 
       - name: Upload Rust test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rust-test-results
           path: test-results-rust.txt
@@ -59,22 +59,27 @@ jobs:
         working-directory: ui
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run UI tests
-        run: npm test -- --reporter=verbose 2>&1 | tee ../test-results-ui.txt
+        run: pnpm test -- --reporter=verbose 2>&1 | tee ../test-results-ui.txt
 
       - name: Upload UI test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-test-results
           path: test-results-ui.txt
@@ -87,7 +92,7 @@ jobs:
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Print Rust results
         run: cat rust-test-results/test-results-rust.txt || echo "No Rust results"

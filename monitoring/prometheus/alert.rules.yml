@@ -77,6 +77,37 @@ groups:
           summary: "Vault balance is low"
           description: "Vault XLM balance is below 100 (current: {{ $value }})."
 
+  # ── Issue #944: BullMQ harvest repeatable job alerts ─────────────────────────
+  - name: aura-harvest-job
+    rules:
+      # Fires when any harvest job exhausts all 3 retries
+      - alert: HarvestJobFailed
+        expr: increase(harvest_job_failure_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "BullMQ harvest job failed all retries"
+          description: >
+            A BullMQ harvest job has exhausted all 3 retry attempts in the
+            last hour. Keeper harvests may have stopped. Check the worker logs
+            for Stellar SDK / Horizon errors.
+
+      # Fires when harvest jobs haven't succeeded in 2× the configured interval
+      - alert: HarvestJobStale
+        expr: >
+          (time() - harvest_job_last_success_timestamp) > (harvest_interval_hours * 7200)
+          and harvest_job_last_success_timestamp > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No successful harvest in >2× the configured interval"
+          description: >
+            The last successful harvest was more than {{ $value | humanizeDuration }}
+            ago, which exceeds twice the configured HARVEST_INTERVAL_HOURS.
+            Verify the harvest worker is running and Horizon is reachable.
+
   - name: aura-vault-operations
     rules:
       - alert: VaultPaused

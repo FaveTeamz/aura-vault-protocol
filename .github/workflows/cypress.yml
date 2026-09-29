@@ -17,7 +17,7 @@ jobs:
         browser: [chrome, firefox, edge]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -38,7 +38,7 @@ jobs:
         run: npx next start &
 
       - name: Run Cypress (${{ matrix.browser }})
-        uses: cypress-io/github-action@v6
+        uses: cypress-io/github-action@v7
         with:
           browser: ${{ matrix.browser }}
           wait-on: "http://localhost:3000"
@@ -49,7 +49,7 @@ jobs:
           CYPRESS_screenshotOnRunFailure: "true"
 
       - name: Upload screenshots on failure
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: cypress-screenshots-${{ matrix.browser }}

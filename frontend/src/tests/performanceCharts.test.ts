@@ -11,8 +11,8 @@ const PERIODS = Object.keys(PERIOD_DAYS) as TimePeriod[];
 describe("generateMockData", () => {
   it.each(PERIODS)("returns correct number of data points for %s", (period) => {
     const data = generateMockData(period);
-    // days + 1 points (inclusive range)
-    expect(data.balanceHistory).toHaveLength(PERIOD_DAYS[period] + 1);
+    const expectedLength = period === "All" ? 1000 : PERIOD_DAYS[period] + 1;
+    expect(data.balanceHistory).toHaveLength(expectedLength);
   });
 
   it("balance grows monotonically from 1000", () => {
@@ -86,10 +86,12 @@ describe("toCSV", () => {
     expect(firstRow).toBe("Date,Balance,APY,Yield Earned");
   });
 
-  it("produces one row per data point plus header", () => {
+  it("produces one row per data point plus header and breakdown rows", () => {
     const data = generateMockData("1W");
     const lines = toCSV(data).split("\n");
-    expect(lines).toHaveLength(data.balanceHistory.length + 1);
+    expect(lines[0]).toBe("Date,Balance,APY,Yield Earned");
+    expect(lines.length).toBeGreaterThanOrEqual(data.balanceHistory.length + 1);
+    expect(lines.some((line) => line.startsWith("Yield Breakdown"))).toBe(true);
   });
 
   it("date column is ISO date format YYYY-MM-DD", () => {
@@ -98,10 +100,11 @@ describe("toCSV", () => {
     expect(dataRow).toMatch(/^\d{4}-\d{2}-\d{2},/);
   });
 
-  it("balance values are formatted to 2 decimal places", () => {
+  it("balance values are formatted to 2 decimal places for data rows", () => {
     const data = generateMockData("1D");
     const rows = toCSV(data).split("\n").slice(1);
-    for (const row of rows) {
+    const dataRows = rows.filter((row) => !row.startsWith("Yield Breakdown"));
+    for (const row of dataRows) {
       const [, balance] = row.split(",");
       expect(balance).toMatch(/^\d+\.\d{2}$/);
     }
@@ -115,5 +118,12 @@ describe("toCSV", () => {
     for (const line of lines.slice(1)) {
       expect(line.split(",")).toHaveLength(4);
     }
+  });
+
+  it("includes yield breakdown details in the exported CSV", () => {
+    const data = generateMockData("1D");
+    const csv = toCSV(data);
+    expect(csv).toContain("Yield Breakdown");
+    expect(csv).toContain("Trading Fees");
   });
 });

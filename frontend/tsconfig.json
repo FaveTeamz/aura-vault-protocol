@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@dnd-kit/core": ["./stubs/@dnd-kit/core"],
+      "@dnd-kit/sortable": ["./stubs/@dnd-kit/sortable"],
+      "@dnd-kit/utilities": ["./stubs/@dnd-kit/utilities"]
     }
   },
   "include": [
